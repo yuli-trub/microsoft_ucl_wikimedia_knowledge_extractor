@@ -21,7 +21,7 @@ categories = wikipedia.categorymembers(
 
 # initialising page to get links titles and that's it?
 page = wikipedia.page(
-    title="Table (information)",
+    title="Python (programming language)",
     pageid=None,
     auto_suggest=True,
     redirect=True,
@@ -85,7 +85,7 @@ sections = page.sections
 # dictionary with subsection
 all_sections = page.table_of_contents
 
-print(page.wikitext)
+print(parse_links)
 
 
 # all above is playing with api

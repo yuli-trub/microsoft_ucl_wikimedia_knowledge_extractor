@@ -35,4 +35,4 @@ def search_wiki(query, url=None, results=10, suggestions=False):
         return []
 
 
-print(search_wiki("Spider-Man", url="https://marvels.fandom.com/api.php"))
+# print(search_wiki("Spider-Man", url="https://marvel.fandom.com/api.php"))

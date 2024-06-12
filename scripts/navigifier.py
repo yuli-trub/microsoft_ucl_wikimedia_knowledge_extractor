@@ -24,6 +24,24 @@ def get_wiki_page(title):
         return None
 
 
+def get_page_categories(page):
+    """get categories of the page
+
+    Parameters
+        page : MediaWikiPage
+            the mediawikipage object
+
+    Returns:
+        categories : list
+            list of categories of the page
+    """
+    try:
+        return page.categories
+    except Exception as e:
+        print(f"Failed to retrieve page categories: {e}")
+        return []
+
+
 def get_page_content(page):
     """get full content
 
@@ -99,4 +117,5 @@ def get_page_html(page):
         return ""
 
 
-print(get_page_html(get_wiki_page("Python (programming language)")))
+# print(get_page_html(get_wiki_page("Python (programming language)")))
+print(get_page_categories((get_wiki_page("Mount Everest"))))

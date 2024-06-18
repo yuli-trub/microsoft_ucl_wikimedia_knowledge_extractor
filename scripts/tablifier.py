@@ -6,6 +6,7 @@ import pandas as pd
 USER_AGENT = "KnowledgeExtractor/1.0 (ucabytr@ucl.ac.uk) Python-requests/2.25.1"
 
 
+# this could be slow if the page is large?
 def get_html_page(page):
     """
     Get the html of a Wiki page

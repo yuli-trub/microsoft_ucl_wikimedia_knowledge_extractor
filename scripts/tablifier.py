@@ -22,7 +22,7 @@ def get_html_page(page):
     return page.html
 
 
-def extract_tables_from_html(html_page):
+def extract_tables(html_page, output_dir=None):
     """
     Extract tables from a Wiki page html
 
@@ -60,4 +60,4 @@ def extract_tables_from_html(html_page):
 wikipedia = MediaWiki(user_agent=USER_AGENT)
 # wikipedia.set_api_url("https://marvel.fandom.com/api.php")
 test_page = wikipedia.page("Mount Everest")
-print(extract_tables_from_html(get_html_page(page=test_page)))
+# print(extract_tables(get_html_page(page=test_page)))

@@ -1,7 +1,7 @@
 from mediawiki import MediaWiki
 
 
-def search_wiki(query, url=None, results=10, suggestions=False):
+def search_wiki(query, url=None, results=4, suggestions=False):
     """
     Search for Wikipedia pages matching the query
 

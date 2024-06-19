@@ -90,4 +90,4 @@ def get_references(page):
             return []
 
 
-get_references("Python (programming language)")
+# get_references("Python (programming language)")

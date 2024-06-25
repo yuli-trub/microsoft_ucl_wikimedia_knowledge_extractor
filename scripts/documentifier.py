@@ -61,6 +61,8 @@ def process_page_into_doc_and_nodes(page_title):
     # document_summary = get_summary(
     #     general_summarisor(document_summary_prompt, text=page_content)
     # )
+    # or
+    # document_summary =  page.summary
 
     document_summary = "Summary of the page"
     print(f"Summary: {document_summary}")

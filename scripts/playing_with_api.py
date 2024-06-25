@@ -85,7 +85,7 @@ sections = page.sections
 # dictionary with subsection
 all_sections = page.table_of_contents
 
-print(parse_links)
+# print(parse_links)
 
 
 # all above is playing with api

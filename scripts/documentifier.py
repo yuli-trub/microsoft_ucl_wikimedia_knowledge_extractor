@@ -1,11 +1,6 @@
 import os
 from llama_index.core import Document
-from llama_index.core.schema import (
-    TextNode,
-    ImageNode,
-    NodeRelationship,
-    RelatedNodeInfo,
-)
+from llama_index.core.schema import TextNode, ImageNode
 from navigifier import (
     get_wiki_page,
     get_intro_content,
@@ -15,6 +10,8 @@ from navigifier import (
     sanitise_filename,
     get_page_categories,
 )
+from imagifier import convert_images_to_png
+from summarisator import general_summarisor, get_summary
 
 
 # create document
@@ -41,13 +38,29 @@ def process_page_into_doc_and_nodes(page_title):
         print(f"Failed to retrieve the page: {page_title}")
         return []
 
-    page_content = page.content
+    page_content = get_page_content(page)
     intro_content = get_intro_content(page_content)
     sections = extract_section_titles(page_content)
     categories = get_page_categories(page)
+    images = convert_images_to_png(page)
+
+    table_of_contents = [
+        (section, subsections) for section, subsections in sections
+    ]  # add to metadata to provide content?
 
     # create summary for the whole page
-    document_summary = "to do summary with LLM later"
+    document_summary_prompt = (
+        "Summarize the following Wikipedia page content. "
+        "The summary should cover the main topics, key points, and significant details. "
+        "The goal is to provide a comprehensive overview that captures the essence of the page, "
+        "making it easy to understand the main ideas without reading the entire content.\n\n"
+    )
+    # document_summary = get_summary(
+    #     general_summarisor(document_summary_prompt, text=page_content)
+    # )
+
+    document_summary = "Summary of the page"
+    print(f"Summary: {document_summary}")
 
     # Create main document for the page
     page_metadata = {
@@ -64,9 +77,10 @@ def process_page_into_doc_and_nodes(page_title):
     nodes = []
     prev_section_node = None
     prev_subsection_node = None
+    prev_image_node = None
 
-    # add node with prev and next metadata
-    def add_node(node, is_section=True):
+    # add text node with prev and next metadata
+    def add_text_node(node, is_section=True):
         nonlocal prev_section_node, prev_subsection_node
         if is_section:
             if prev_section_node:
@@ -80,6 +94,15 @@ def process_page_into_doc_and_nodes(page_title):
             prev_subsection_node = node
         nodes.append(node)
 
+    # add image node with prev and next metadata
+    def add_image_node(node):
+        nonlocal prev_image_node
+        if prev_image_node:
+            prev_image_node.metadata["next"] = node.metadata["id"]
+            node.metadata["prev"] = prev_image_node.metadata["id"]
+        prev_image_node = node
+        nodes.append(node)
+
     # Create intro node
     intro_content = get_intro_content(page_content)
     if intro_content:
@@ -91,7 +114,7 @@ def process_page_into_doc_and_nodes(page_title):
             "context_summary": document_summary,
         }
         intro_node = create_text_node(content=intro_content, metadata=intro_metadata)
-        add_node(intro_node, is_section=True)
+        add_text_node(intro_node, is_section=True)
 
     # Create section and subsection nodes
     sections = extract_section_titles(page_content)
@@ -108,7 +131,7 @@ def process_page_into_doc_and_nodes(page_title):
             section_node = create_text_node(
                 content=section_content, metadata=section_metadata
             )
-            add_node(section_node, is_section=True)
+            add_text_node(section_node, is_section=True)
 
             prev_subsection_node = None
 
@@ -124,15 +147,30 @@ def process_page_into_doc_and_nodes(page_title):
                     subsection_node = create_text_node(
                         content=subsection_content, metadata=subsection_metadata
                     )
-                    add_node(subsection_node, is_section=False)
+                    add_text_node(subsection_node, is_section=False)
+
+    # create image nodes - todo: later add classification and metadata type of plot or image
+    for image in images:
+        image_metadata = {
+            "id": image["image_name"],
+            "type": "image",
+            "source": page_metadata["id"],
+            "parent_id": page_metadata["id"],
+            "context_summary": document_summary,
+        }
+        image_node = create_image_node(
+            image_data=image["image_data"], metadata=image_metadata
+        )
+        add_image_node(image_node)
 
     return [main_document] + nodes
 
 
 base_dir = "../data"
-documents = process_page_into_doc_and_nodes("Mount Everest")
+documents = process_page_into_doc_and_nodes("Python (programming language)")
 
 for doc in documents:
-    print(f"metadata: {doc.metadata}")
+    print(f"metadata:{doc.metadata}")
+
     print(f"Content: {doc.text[:100]}...")
     print()

@@ -89,15 +89,14 @@ def convert_images_to_png(page, min_size=(50, 50)):
 
     headers = {"User-Agent": USER_AGENT}
 
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    images_dir = os.path.join(script_dir, "../data/images")
-    svg_dir = os.path.join(script_dir, "../data/images/svg")
-    png_dir = os.path.join(script_dir, "../data/images/png")
+    # script_dir = os.path.dirname(os.path.abspath(__file__))
+    # images_dir = os.path.join(script_dir, "../data/images")
+    # svg_dir = os.path.join(script_dir, "../data/images/svg")
+    # png_dir = os.path.join(script_dir, "../data/images/png")
 
     png_images = []
 
     for image_url in images:
-
         try:
             response = requests.get(image_url, headers=headers)
             response.raise_for_status()
@@ -105,27 +104,25 @@ def convert_images_to_png(page, min_size=(50, 50)):
             image_name = os.path.basename(image_url)
             image_name = clean_filename(image_name)
             image_name_without_ext = os.path.splitext(image_name)[0]
-            os.makedirs(images_dir, exist_ok=True)
-            os.makedirs(svg_dir, exist_ok=True)
-            os.makedirs(png_dir, exist_ok=True)
 
             if is_image_too_small(image_data, min_size):
                 print(f"Skipping image {image_name} as it is too small.")
                 continue
 
             if image_url.endswith(".svg"):
-                svg_path = f"{svg_dir}/{image_name_without_ext}.svg"
-                save_svg(image_data, svg_path)
-
                 preprocessed_svg = preprocess_svg(image_data.decode("utf-8"))
-
                 try:
-                    cairosvg.svg2png(
-                        bytestring=preprocessed_svg.encode("utf-8"),
-                        write_to=f"{png_dir}/{image_name_without_ext}.png",
+                    print(f"Image size: {image.size}")
+                    png_data = cairosvg.svg2png(
+                        bytestring=preprocessed_svg.encode("utf-8")
                     )
-                    print(f"Converted SVG to PNG: {image_name_without_ext}.png")
-
+                    png_images.append(
+                        {
+                            "image_data": base64.b64encode(png_data).decode("utf-8"),
+                            "image_name": image_name_without_ext,
+                        }
+                    )
+                    print(f"Converted SVG to PNG: {image_name_without_ext}")
                 except Exception as e:
                     print(
                         f"Error converting SVG to PNG for URL: {image_url}. Error: {e}"
@@ -133,23 +130,36 @@ def convert_images_to_png(page, min_size=(50, 50)):
             else:
                 try:
                     image = Image.open(io.BytesIO(image_data))
+                    png_buffer = io.BytesIO()
                     if image.format != "PNG":
-                        image.save(f"{png_dir}/{image_name_without_ext}.png", "PNG")
-                        print(f"Converted image to PNG: {image_name_without_ext}.png")
-                    else:
-                        save_image(
-                            image_data,
-                            f"{png_dir}/{image_name_without_ext}.png",
+                        if image.mode == "CMYK":
+                            image = image.convert("RGB")
+                        image.save(png_buffer, format="PNG")
+                        png_data = png_buffer.getvalue()
+                        png_images.append(
+                            {
+                                "image_data": base64.b64encode(png_data).decode(
+                                    "utf-8"
+                                ),
+                                "image_name": image_name_without_ext,
+                            }
                         )
-                        print(f"Saved PNG image: {image_name_without_ext}.png")
+                        print(f"Converted image to PNG: {image_name_without_ext}")
+                    else:
+                        png_images.append(
+                            {
+                                "image_data": base64.b64encode(image_data).decode(
+                                    "utf-8"
+                                ),
+                                "image_name": image_name_without_ext,
+                            }
+                        )
+                        print(f"Saved PNG image: {image_name_without_ext}")
                 except UnidentifiedImageError:
                     print(f"Unable to identify image at URL: {image_url}")
-                    save_image(
-                        image_data,
-                        f"{png_dir}/{image_name_without_ext}_error.png",
-                    )
-                    print(
-                        f"Saved image with error to check: {image_name_without_ext}_error.png"
-                    )
+
         except requests.exceptions.RequestException as e:
             print(f"Error downloading image from URL: {image_url}. Error: {e}")
+    print(f"Total images converted: {len(png_images)}")  # todo: remove later
+
+    return png_images

@@ -56,7 +56,7 @@ def encode_image_from_file(image_path):
         return base64.b64encode(image_data).decode("utf-8")
 
 
-def classify_image(image_path):
+def classify_image_from_file(image_path):
 
     base64_image = encode_image_from_file(image_path)
 
@@ -107,7 +107,7 @@ def classify_image(image_path):
 
 
 image_path = "../data/image.png"
-response = classify_image(image_path)
+response = classify_image_from_file(image_path)
 
 
 # Extract and print classification result

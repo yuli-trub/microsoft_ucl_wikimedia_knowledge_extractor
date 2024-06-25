@@ -143,7 +143,7 @@ def get_intro_content(page_content):
     return intro_content
 
 
-# splitting the sectins and subsections
+# splitting the sectins and subsections to see the hierarchical structure of the page - contents
 def extract_section_titles(page_content):
     # identify pattern with == section == or === subsection ===
     section_pattern = re.compile(r"(^==[^=].*?==)|(^===.*?===)", re.MULTILINE)
@@ -173,6 +173,7 @@ def extract_section_titles(page_content):
     return sections
 
 
+# helper fucntion to save to dir
 def sanitise_filename(filename):
     """
     Sanitise a string to be used as a filename
@@ -193,6 +194,9 @@ def sanitise_filename(filename):
     filename = re.sub(r"[\s_]+", "-", filename)
 
     return filename
+
+
+# TODO: figure out references and references section - avoid or match with urls retrieved with API
 
 
 # get content for each section and subsection and save it in a dictionary hierarchiecally

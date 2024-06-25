@@ -1,85 +1,136 @@
 import os
-from llama_index.core import Document, VectorStoreIndex
-from navigifier import sanitise_filename
+from llama_index.core import Document
+from llama_index.core.schema import (
+    TextNode,
+    ImageNode,
+    NodeRelationship,
+    RelatedNodeInfo,
+)
+from navigifier import (
+    get_wiki_page,
+    get_intro_content,
+    extract_section_titles,
+    get_section_content,
+    get_page_content,
+    sanitise_filename,
+    get_page_categories,
+)
 
 
-def load_text_documents(base_dir, page_name):
-    """
-    Load documents from the specified directory
+# create document
+def create_document(title, content, metadata=None):
+    return Document(text=content, title=title, metadata=metadata)
 
-    Parameters:
-        base_dir : str
-            The base directory to load the documents
 
-    Returns:
-        list
-            List of Document objects
-    """
+# text nodes for setions etc
+def create_text_node(content, metadata=None):
+    return TextNode(text=content, metadata=metadata)
 
-    documents = []
-    page_name = sanitise_filename(page_name)
-    page_dir = os.path.join(base_dir, page_name)
 
-    intro_path = os.path.join(page_dir, "content", "Introduction", "Introduction.txt")
-    if os.path.exists(intro_path):
-        with open(intro_path, "r", encoding="utf-8") as f:
-            intro_content = f.read()
-        intro_doc = Document(
-            text=f"Introduction\n{intro_content}",
-            title="Introduction",
-            metadata={"id": f"{page_name}_intro", "parent_id": f"{page_name}"},
-        )
-        documents.append(intro_doc)
+def create_image_node(image_data, metadata=None):
+    return ImageNode(image=image_data, metadata=metadata)
 
-    content_dir = os.path.join(page_dir, "content")
-    for section in os.listdir(content_dir):
-        section_path = os.path.join(content_dir, section)
-        if os.path.isdir(section_path) and section != "Introduction":
-            section_id = sanitise_filename(section)
-            section_content_path = os.path.join(section_path, f"{section_id}.txt")
-            if os.path.exists(section_content_path):
-                with open(section_content_path, "r", encoding="utf-8") as f:
-                    section_content = f.read()
-                section_doc = Document(
-                    text=f"{section}\n{section_content}",
-                    title=section,
-                    metadata={
-                        "id": f"{page_name}_{section_id}",
-                        "parent_id": f"{page_name}",
-                    },
-                )
-                documents.append(section_doc)
 
-            for subsection in os.listdir(section_path):
-                if subsection != f"{section_id}.txt":
-                    subsection_path = os.path.join(section_path, subsection)
-                    if os.path.isdir(subsection_path):
-                        subsection_id = sanitise_filename(subsection)
-                        subsection_content_path = os.path.join(
-                            # get rid of sub if i get rid of it in navigifier?
-                            subsection_path,
-                            f"sub-{subsection_id}.txt",
-                        )
-                        if os.path.exists(subsection_content_path):
-                            with open(
-                                subsection_content_path, "r", encoding="utf-8"
-                            ) as f:
-                                subsection_content = f.read()
-                            subsection_doc = Document(
-                                text=f"{subsection_id}\n{subsection_content}",
-                                title=subsection_id,
-                                metadata={
-                                    "id": f"{page_name}_{section_id}_{subsection_id}",
-                                    "parent_id": f"{page_name}_{section_id}",
-                                },
-                            )
-                            documents.append(subsection_doc)
+def create_table_node(table_data, metadata=None):
+    return TextNode(table=table_data, metadata=metadata)
 
-    return documents
+
+def process_page_into_doc_and_nodes(page_title):
+    page = get_wiki_page(page_title)
+    if not page:
+        print(f"Failed to retrieve the page: {page_title}")
+        return []
+
+    page_content = page.content
+    intro_content = get_intro_content(page_content)
+    sections = extract_section_titles(page_content)
+    categories = get_page_categories(page)
+
+    # create summary for the whole page
+    document_summary = "to do summary with LLM later"
+
+    # Create main document for the page
+    page_metadata = {
+        "id": sanitise_filename(page_title),
+        "title": page_title,
+        "type": "page",
+        "summary": document_summary,
+        "categories": categories,  # not sure if a list is ok?
+    }
+    main_document = create_document(
+        title=page_title, content=page_content, metadata=page_metadata
+    )
+
+    nodes = []
+    prev_section_node = None
+    prev_subsection_node = None
+
+    # add node with prev and next metadata
+    def add_node(node, is_section=True):
+        nonlocal prev_section_node, prev_subsection_node
+        if is_section:
+            if prev_section_node:
+                prev_section_node.metadata["next"] = node.metadata["id"]
+                node.metadata["prev"] = prev_section_node.metadata["id"]
+            prev_section_node = node
+        else:
+            if prev_subsection_node:
+                prev_subsection_node.metadata["next"] = node.metadata["id"]
+                node.metadata["prev"] = prev_subsection_node.metadata["id"]
+            prev_subsection_node = node
+        nodes.append(node)
+
+    # Create intro node
+    intro_content = get_intro_content(page_content)
+    if intro_content:
+        intro_metadata = {
+            "id": f"{page_metadata['id']}_intro",
+            "parent_id": page_metadata["id"],
+            "type": "section",
+            "source": page_metadata["id"],
+            "context_summary": document_summary,
+        }
+        intro_node = create_text_node(content=intro_content, metadata=intro_metadata)
+        add_node(intro_node, is_section=True)
+
+    # Create section and subsection nodes
+    sections = extract_section_titles(page_content)
+    for section_title, subsections in sections:
+        section_content = get_section_content(page, section_title)
+        if section_content:
+            section_metadata = {
+                "id": f"{sanitise_filename(section_title)}",
+                "parent_id": page_metadata["id"],
+                "source": page_metadata["id"],
+                "type": "section",
+                "context_summary": document_summary,
+            }
+            section_node = create_text_node(
+                content=section_content, metadata=section_metadata
+            )
+            add_node(section_node, is_section=True)
+
+            prev_subsection_node = None
+
+            for subsection_title in subsections:
+                subsection_content = get_section_content(page, subsection_title)
+                if subsection_content:
+                    subsection_metadata = {
+                        "id": f"{sanitise_filename(subsection_title)}",
+                        "parent_id": section_metadata["id"],
+                        "source": page_metadata["id"],
+                        "type": "subsection",
+                    }
+                    subsection_node = create_text_node(
+                        content=subsection_content, metadata=subsection_metadata
+                    )
+                    add_node(subsection_node, is_section=False)
+
+    return [main_document] + nodes
 
 
 base_dir = "../data"
-documents = load_text_documents(base_dir, "Spider-Man")
+documents = process_page_into_doc_and_nodes("Mount Everest")
 
 for doc in documents:
     print(f"metadata: {doc.metadata}")

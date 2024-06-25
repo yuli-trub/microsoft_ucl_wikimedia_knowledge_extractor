@@ -6,34 +6,22 @@ import os
 import io
 from bs4 import BeautifulSoup
 import re
-
+import base64
 import sys
-
-# to do:
-# add env variables instead of hardcoded stuff
-
-# TRYING TO SOLVE CONFIG ISSUES WITH CAIRO LIBRARY - had issues with local PATH and stuff
-
-# check MSYS2 mingw64 bin is in the PATH
-# msys2_path = r"C:\msys64\mingw64\bin"
-# if msys2_path not in os.environ["PATH"]:
-#     os.environ["PATH"] = msys2_path + ";" + os.environ["PATH"]
-
-# PATH and sys.path for debugging
-# print("PATH:", os.environ["PATH"])
-# print("sys.path:", sys.path)
-
-# explicitly loading the libcairo-2.dll using ctypes
 import ctypes
+from openai import AzureOpenAI
+from dotenv import load_dotenv
+
+load_dotenv()
+USER_AGENT = os.getenv("USER_AGENT")
+CONFIG_CAIRO_PATH = os.getenv("CONFIG_CAIRO_PATH")
+
 
 try:
-    ctypes.CDLL("C:\\msys64\\mingw64\\bin\\libcairo-2.dll")
+    ctypes.CDLL(CONFIG_CAIRO_PATH)
 except OSError as e:
     print(f"Error loading libcairo-2.dll: {e}")
 import cairosvg
-
-
-USER_AGENT = "KnowledgeExtractor/1.0 (ucabytr@ucl.ac.uk) Python-requests/2.25.1"
 
 
 def save_svg(svg_content, file_path):
@@ -71,6 +59,16 @@ def clean_filename(filename):
     return re.sub(r'[\\/*?:"<>|]', "", filename)
 
 
+def encode_image_from_file(image_path):
+    with open(image_path, "rb") as image_file:
+        image_data = image_file.read()
+        return base64.b64encode(image_data).decode("utf-8")
+
+
+def encode_image_from_memory(image_data):
+    return base64.b64encode(image_data).decode("utf-8")
+
+
 def convert_images_to_png(page, min_size=(50, 50)):
     """
     Download all images from a wiki page and convert them to PNG format
@@ -86,16 +84,7 @@ def convert_images_to_png(page, min_size=(50, 50)):
     Returns
         None
     """
-    # wikipedia = MediaWiki(user_agent=USER_AGENT)
-    # if url:
-    #     try:
-    #         wikipedia.set_api_url(url)
-    #     except Exception as e:
-    #         print(f"Error setting API URL: {e}. Defaulting to Wikipedia.")
-    #         wikipedia.set_api_url("https://en.wikipedia.org/w/api.php")
 
-    # page = wikipedia.page(page_title)
-    print(page)
     images = page.images
 
     headers = {"User-Agent": USER_AGENT}
@@ -104,6 +93,8 @@ def convert_images_to_png(page, min_size=(50, 50)):
     images_dir = os.path.join(script_dir, "../data/images")
     svg_dir = os.path.join(script_dir, "../data/images/svg")
     png_dir = os.path.join(script_dir, "../data/images/png")
+
+    png_images = []
 
     for image_url in images:
 
@@ -134,6 +125,7 @@ def convert_images_to_png(page, min_size=(50, 50)):
                         write_to=f"{png_dir}/{image_name_without_ext}.png",
                     )
                     print(f"Converted SVG to PNG: {image_name_without_ext}.png")
+
                 except Exception as e:
                     print(
                         f"Error converting SVG to PNG for URL: {image_url}. Error: {e}"
@@ -161,11 +153,3 @@ def convert_images_to_png(page, min_size=(50, 50)):
                     )
         except requests.exceptions.RequestException as e:
             print(f"Error downloading image from URL: {image_url}. Error: {e}")
-
-
-# test with somewikipedia page
-
-# wikipedia = MediaWiki(user_agent=USER_AGENT)
-# wikipedia.set_api_url("https://marvel.fandom.com/api.php")
-# test_page = wikipedia.page("Ororo Munroe (Earth-616)")
-# convert_images_to_png(page=test_page)

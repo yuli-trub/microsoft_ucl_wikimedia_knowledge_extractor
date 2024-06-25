@@ -17,7 +17,7 @@ def main():
     wikipedia = MediaWiki(user_agent="KnowledgeExtractor/1.0 (ucabytr@ucl.ac.uk)")
 
     # searchinator - search for pages
-    query = "Spider-Man"
+    query = "Everest"
     # url = "https://marvels.fandom.com/api.php"
     url = "https://en.wikipedia.org/w/api.php"
 

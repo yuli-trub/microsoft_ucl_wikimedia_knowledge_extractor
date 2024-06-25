@@ -22,7 +22,7 @@ def get_html_page(page):
     return page.html
 
 
-def extract_tables(html_page, output_dir=None):
+def extract_tables(html_page):
     """
     Extract tables from a Wiki page html
 

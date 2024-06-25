@@ -112,7 +112,7 @@ def convert_images_to_png(page, min_size=(50, 50)):
             if image_url.endswith(".svg"):
                 preprocessed_svg = preprocess_svg(image_data.decode("utf-8"))
                 try:
-                    print(f"Image size: {image.size}")
+
                     png_data = cairosvg.svg2png(
                         bytestring=preprocessed_svg.encode("utf-8")
                     )

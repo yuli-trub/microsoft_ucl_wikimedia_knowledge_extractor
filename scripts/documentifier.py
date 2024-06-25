@@ -12,6 +12,7 @@ from navigifier import (
 )
 from imagifier import convert_images_to_png
 from summarisator import general_summarisor, get_summary
+from tablifier import get_html_page, extract_tables
 
 
 # create document
@@ -43,6 +44,8 @@ def process_page_into_doc_and_nodes(page_title):
     sections = extract_section_titles(page_content)
     categories = get_page_categories(page)
     images = convert_images_to_png(page)
+    page_html = get_html_page(page)
+    tables = extract_tables(page_html)
 
     table_of_contents = [
         (section, subsections) for section, subsections in sections
@@ -78,6 +81,7 @@ def process_page_into_doc_and_nodes(page_title):
     prev_section_node = None
     prev_subsection_node = None
     prev_image_node = None
+    prev_table_node = None
 
     # add text node with prev and next metadata
     def add_text_node(node, is_section=True):
@@ -101,6 +105,15 @@ def process_page_into_doc_and_nodes(page_title):
             prev_image_node.metadata["next"] = node.metadata["id"]
             node.metadata["prev"] = prev_image_node.metadata["id"]
         prev_image_node = node
+        nodes.append(node)
+
+    # add table node with prev and next metadata
+    def add_table_node(node):
+        nonlocal prev_table_node
+        if prev_table_node:
+            prev_table_node.metadata["next"] = node.metadata["id"]
+            node.metadata["prev"] = prev_table_node.metadata["id"]
+        prev_table_node = node
         nodes.append(node)
 
     # Create intro node
@@ -163,14 +176,38 @@ def process_page_into_doc_and_nodes(page_title):
         )
         add_image_node(image_node)
 
+    # create table nodes
+    for idx, table in enumerate(tables):
+        table_content = table.to_csv(index=False)
+        table_metadata = {
+            "id": f"{page_metadata['id']}_table_{idx}",
+            "parent_id": page_metadata["id"],
+            "source": page_metadata["id"],
+            "type": "table",
+            "context_summary": document_summary,
+        }
+        table_node = create_text_node(content=table_content, metadata=table_metadata)
+        add_table_node(table_node)
+
     return [main_document] + nodes
 
 
 base_dir = "../data"
 documents = process_page_into_doc_and_nodes("Python (programming language)")
 
-for doc in documents:
-    print(f"metadata:{doc.metadata}")
 
-    print(f"Content: {doc.text[:100]}...")
-    print()
+# def check_table_nodes(documents):
+#     for doc in documents:
+#         if "type" in doc.metadata and doc.metadata["type"] == "table":
+#             print(f"Table Node ID: {doc.metadata['id']}")
+#             print(f"Table Content: {doc.text}")
+#             print()
+
+
+# check_table_nodes(documents)
+
+# for doc in documents:
+#     print(f"metadata:{doc.metadata}")
+
+#     print(f"Content: {doc.text[:100]}...")
+#     print()

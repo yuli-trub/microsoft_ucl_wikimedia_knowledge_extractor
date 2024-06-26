@@ -106,7 +106,7 @@ def convert_images_to_png(page, min_size=(50, 50)):
             image_name_without_ext = os.path.splitext(image_name)[0]
 
             if is_image_too_small(image_data, min_size):
-                print(f"Skipping image {image_name} as it is too small.")
+                # print(f"Skipping image {image_name} as it is too small.")
                 continue
 
             if image_url.endswith(".svg"):
@@ -122,7 +122,7 @@ def convert_images_to_png(page, min_size=(50, 50)):
                             "image_name": image_name_without_ext,
                         }
                     )
-                    print(f"Converted SVG to PNG: {image_name_without_ext}")
+                    # print(f"Converted SVG to PNG: {image_name_without_ext}")
                 except Exception as e:
                     print(
                         f"Error converting SVG to PNG for URL: {image_url}. Error: {e}"
@@ -144,7 +144,7 @@ def convert_images_to_png(page, min_size=(50, 50)):
                                 "image_name": image_name_without_ext,
                             }
                         )
-                        print(f"Converted image to PNG: {image_name_without_ext}")
+                        # print(f"Converted image to PNG: {image_name_without_ext}")
                     else:
                         png_images.append(
                             {
@@ -154,7 +154,7 @@ def convert_images_to_png(page, min_size=(50, 50)):
                                 "image_name": image_name_without_ext,
                             }
                         )
-                        print(f"Saved PNG image: {image_name_without_ext}")
+                        # print(f"Saved PNG image: {image_name_without_ext}")
                 except UnidentifiedImageError:
                     print(f"Unable to identify image at URL: {image_url}")
 

@@ -191,7 +191,7 @@ def sanitise_filename(filename):
         filename = filename.replace(char, "-")
 
     # replace -- with single -
-    filename = re.sub(r"[\s_]+", "-", filename)
+    filename = re.sub(r"[\s-]+", "-", filename)
 
     return filename
 

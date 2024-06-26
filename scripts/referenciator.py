@@ -78,14 +78,22 @@ def get_external_links_by_section(page):
     """
     sections = get_page_sections(page)
     external_links = {}
+    image_extensions = {".jpg", ".jpeg", ".png", ".svg", ".gif"}
 
     for section in sections:
+        if section == "References":
+            continue
         parsed_section_links = page.parse_section_links(section)
         filtered_links = [
-            link for link in parsed_section_links if "cite_note" not in link[1]
+            link
+            for link in parsed_section_links
+            if "cite_note" not in link[1]
+            and not any(link[1].lower().endswith(ext) for ext in image_extensions)
         ]
         if filtered_links:
-            external_links[section] = filtered_links
+            external_links[section] = list(
+                dict.fromkeys(filtered_links)
+            )  # delete duplicates
 
     return external_links
 
@@ -107,6 +115,8 @@ def get_cite_note_links_by_section(page):
     cite_note_links = {}
 
     for section in sections:
+        if section == "References":
+            continue
         parsed_section_links = page.parse_section_links(section)
         filtered_links = [
             link[0].strip("[]")
@@ -162,22 +172,30 @@ def map_references_to_tuples(references):
     mapped_references = []
     current_ref = None
     current_links = []
+    current_title = None
 
     for ref in filtered_references:
         if ref[0] == "^":
             # When we encounter a new cite-ref, save the current tuple
             if current_ref and current_links:
                 mapped_references.append(
-                    (current_ref, current_links[0], *current_links[1:])
+                    (current_ref, current_title, current_links[0], *current_links[1:])
                 )
             # Start a new tuple
             current_ref = ref[1]
             current_links = []
+            current_title = None
+
+        elif not current_title:
+            current_title = ref[0]
+            current_links.append(ref[1])
         else:
             current_links.append(ref[1])
 
     if current_ref:
-        mapped_references.append((current_ref, current_links[0], *current_links[1:]))
+        mapped_references.append(
+            (current_ref, current_title, current_links[0], *current_links[1:])
+        )
 
     return mapped_references
 
@@ -215,19 +233,31 @@ def create_section_links_dict(sections_with_refs, mapped_references):
             ref_number = cite_ref.strip("[]")
             if ref_number in ref_dict:
                 ref_tuple = ref_dict[ref_number]
-                section_links_dict[section]["actual_links"].append(ref_tuple[1])
-                section_links_dict[section]["archived_links"].extend(ref_tuple[2:])
+                section_links_dict[section]["actual_links"].append(
+                    (ref_tuple[1], ref_tuple[2])
+                )
+                section_links_dict[section]["archived_links"].append(
+                    (ref_tuple[1], ref_tuple[3:])
+                )
                 used_refs.add(ref_number)
 
     # Add references that were not used in any section to the intro section
     for ref_number, ref_tuple in ref_dict.items():
         if ref_number not in used_refs:
-            introduction_links["actual_links"].append(ref_tuple[1])
-            introduction_links["archived_links"].extend(ref_tuple[2:])
+            introduction_links["actual_links"].append((ref_tuple[1], ref_tuple[2]))
+            introduction_links["archived_links"].append((ref_tuple[1], ref_tuple[3:]))
 
     section_links_dict = {"Introduction": introduction_links} | section_links_dict
 
     return section_links_dict
+
+
+def get_all_citations(page):
+    citations = create_section_links_dict(
+        get_cite_note_links_by_section(page),
+        (map_references_to_tuples(get_reference_section_links(page))),
+    )
+    return citations
 
 
 # test
@@ -236,12 +266,10 @@ page = wikipedia.page("Python (programming language)")
 # print(get_references(page))
 # print(get_all_page_links(page))
 
-print(
-    create_section_links_dict(
-        get_cite_note_links_by_section(page),
-        (map_references_to_tuples(get_reference_section_links(page))),
-    )
-)
+# print(get_all_citations(page))
+
+# print(map_references_to_tuples(get_reference_section_links(page)))
 
 
-# print(get_cite_note_links_by_section(page))
+# todo - maybe need references linked to sentences to create child sentence node and ref node?
+# print(get_external_links_by_section(page))

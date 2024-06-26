@@ -86,6 +86,6 @@ sections = page.sections
 all_sections = page.table_of_contents
 
 # print(parse_links)
-
+print(page.html)
 
 # all above is playing with api

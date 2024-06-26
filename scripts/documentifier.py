@@ -13,6 +13,10 @@ from navigifier import (
 from imagifier import convert_images_to_png
 from summarisator import general_summarisor, get_summary
 from tablifier import get_html_page, extract_tables
+from referenciator import (
+    get_external_links_by_section,
+    get_all_citations,
+)
 
 
 # create document
@@ -20,7 +24,7 @@ def create_document(title, content, metadata=None):
     return Document(text=content, title=title, metadata=metadata)
 
 
-# text nodes for setions etc
+# create different nodes
 def create_text_node(content, metadata=None):
     return TextNode(text=content, metadata=metadata)
 
@@ -31,6 +35,14 @@ def create_image_node(image_data, metadata=None):
 
 def create_table_node(table_data, metadata=None):
     return TextNode(table=table_data, metadata=metadata)
+
+
+def create_reference_node(link, metadata=None):
+    return TextNode(text=link, metadata=metadata)
+
+
+def create_citation_node(link, metadata=None):
+    return TextNode(text=link, metadata=metadata)
 
 
 def process_page_into_doc_and_nodes(page_title):
@@ -46,10 +58,13 @@ def process_page_into_doc_and_nodes(page_title):
     images = convert_images_to_png(page)
     page_html = get_html_page(page)
     tables = extract_tables(page_html)
+    reference_dict = get_all_citations(page)
+    wiki_links_dict = get_external_links_by_section(page)
 
     table_of_contents = [
         (section, subsections) for section, subsections in sections
     ]  # add to metadata to provide content?
+    # table_of_contents = page.table_of_contents
 
     # create summary for the whole page
     document_summary_prompt = (
@@ -84,6 +99,8 @@ def process_page_into_doc_and_nodes(page_title):
     prev_subsection_node = None
     prev_image_node = None
     prev_table_node = None
+    prev_reference_node = None
+    prev_citation_node = None
 
     # add text node with prev and next metadata
     def add_text_node(node, is_section=True):
@@ -116,6 +133,22 @@ def process_page_into_doc_and_nodes(page_title):
             prev_table_node.metadata["next"] = node.metadata["id"]
             node.metadata["prev"] = prev_table_node.metadata["id"]
         prev_table_node = node
+        nodes.append(node)
+
+    def add_reference_node(node):
+        nonlocal prev_reference_node
+        if prev_reference_node:
+            prev_reference_node.metadata["next"] = node.metadata["id"]
+            node.metadata["prev"] = prev_reference_node.metadata["id"]
+        prev_reference_node = node
+        nodes.append(node)
+
+    def add_citation_node(node):
+        nonlocal prev_citation_node
+        if prev_citation_node:
+            prev_citation_node.metadata["next"] = node.metadata["id"]
+            node.metadata["prev"] = prev_citation_node.metadata["id"]
+        prev_citation_node = node
         nodes.append(node)
 
     # Create intro node
@@ -191,6 +224,50 @@ def process_page_into_doc_and_nodes(page_title):
         table_node = create_text_node(content=table_content, metadata=table_metadata)
         add_table_node(table_node)
 
+    # create wiki refs nodes
+    for section, links in wiki_links_dict.items():
+        for link in links:
+            reference_metadata = {
+                "id": f"{sanitise_filename(link[0])}",
+                "parent_id": sanitise_filename(section),
+                "source": page_metadata["id"],
+                "type": "wiki-ref",
+            }
+            reference_node = create_reference_node(link[1], metadata=reference_metadata)
+            add_reference_node(reference_node)
+
+    # create citation nodes
+    for section, links in reference_dict.items():
+        for link in links["actual_links"]:
+            url = link[1]
+            title = sanitise_filename(link[0].strip('""'))
+            citation_metadata = {
+                "id": title,
+                "parent_id": sanitise_filename(section),
+                "source": page_metadata["id"],
+                "type": "citation",
+            }
+            citation_node = create_citation_node(url, metadata=citation_metadata)
+            add_citation_node(citation_node)
+
+            # archived links nodes
+        for idx, urls in enumerate(links["archived_links"]):
+            title = sanitise_filename(urls[0].strip('""'))
+            if len(urls[1]) == 0:
+                continue
+            for url_idx, url in enumerate(urls[1]):
+                unique_suffix = (
+                    f"archive-{url_idx + 1}" if len(urls[1]) > 1 else "archive"
+                )
+                citation_metadata = {
+                    "id": f"{title}-{unique_suffix}",
+                    "parent_id": sanitise_filename(section),
+                    "source": page_metadata["id"],
+                    "type": "archive-citation",
+                }
+                citation_node = create_citation_node(url, metadata=citation_metadata)
+                add_citation_node(citation_node)
+
     return [main_document] + nodes
 
 
@@ -198,15 +275,15 @@ base_dir = "../data"
 documents = process_page_into_doc_and_nodes("Python (programming language)")
 
 
-# def check_table_nodes(documents):
-#     for doc in documents:
-#         if "type" in doc.metadata and doc.metadata["type"] == "table":
-#             print(f"Table Node ID: {doc.metadata['id']}")
-#             print(f"Table Content: {doc.text}")
-#             print()
+def check_nodes(documents, type):
+    for doc in documents:
+        if "type" in doc.metadata and doc.metadata["type"] == type:
+            print(f"Node ID: {doc.metadata['id']}")
+            print(f"Node Content: {doc.text}")
+            print()
 
 
-# check_table_nodes(documents)
+check_nodes(documents, "archive-citation")
 
 # for doc in documents:
 #     print(f"metadata:{doc.metadata}")

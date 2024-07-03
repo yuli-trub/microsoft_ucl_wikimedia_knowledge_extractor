@@ -3,7 +3,6 @@ from dotenv import load_dotenv
 import os
 import requests
 import base64
-from pydantic import BaseModel, Field
 from PIL import Image
 import io
 from llama_index.core.schema import TransformComponent
@@ -14,6 +13,7 @@ from llama_index.core.node_parser import SemanticSplitterNodeParser
 import logging
 from datetime import datetime
 from llama_index.embeddings.azure_openai import AzureOpenAIEmbedding
+from llama_index.core import Settings
 
 
 logging.basicConfig(
@@ -24,9 +24,8 @@ logging.basicConfig(
 )
 
 
+# get env variables
 def load_env():
-    from dotenv import load_dotenv
-
     load_dotenv()
 
     AZURE_OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -63,6 +62,43 @@ headers = {
 }
 
 
+# Configure global settings
+Settings.embed_model = AzureOpenAIEmbedding(
+    model="text-embedding-ada-002",
+    deployment_name=EMBEDDING_DEPLOYMENT_ID,
+    api_key=AZURE_OPENAI_API_KEY,
+    azure_endpoint=OPENAI_ENDPOINT,
+    api_version=EMBEDDING_API_VERSION,
+)
+
+
+Settings.text_splitter = SemanticSplitterNodeParser(
+    buffer_size=1, breakpoint_percentile_threshold=80, embed_model=Settings.embed_model
+)
+
+
+# text cleaner from llamaindex
+class TextCleaner(TransformComponent):
+    def __call__(self, nodes, **kwargs):
+        print(f"Processing {len(nodes)} nodes")
+        for node in nodes:
+            if node.metadata.get("type") in ["section", "subsection"]:
+                print(f"Processing node ID: {node.metadata['id']}")
+                print(f"Original text: {node.text[:150]}...")
+                node.text = re.sub(r"[^0-9A-Za-z ]", "", node.text)
+                print(f"Cleaned text: {node.text[:150]}...")
+
+        return nodes
+
+
+# TODO:
+# text node:
+#   - key takeaways points list
+#   - summary
+#   - if there is an event or dates - list them
+#   - list of references? - idk if i need it bc references are attached to each section anyway
+
+
 class OpenAIBaseTransformation(TransformComponent):
     def openai_request(self, prompt, text):
         payload = {
@@ -97,23 +133,20 @@ class OpenAIBaseTransformation(TransformComponent):
 
 
 class SemanticChunkingTransformation(TransformComponent):
-    def __init__(self, embed_model):
-        self.splitter = SemanticSplitterNodeParser(
-            buffer_size=1, breakpoint_percentile_threshold=80, embed_model=embed_model
-        )
-
-    def __call__(self, nodes):
+    def __call__(self, documents, **kwargs):
         transformed_nodes = []
-        for idx, node in enumerate(nodes):
+        splitter = Settings.text_splitter  # Use global setting
+
+        for idx, node in enumerate(documents):
             if node.metadata.get("type") in ["section", "subsection"]:
-                chunks = self.splitter.get_nodes_from_documents([node])
+                chunks = splitter.get_nodes_from_documents([node])
                 for chunk in chunks:
                     chunk.metadata["id"] = f"{node.metadata['id']}_chunk_{idx}"
                     chunk.metadata["parent_id"] = node.metadata["id"]
                 transformed_nodes.extend(chunks)
             else:
                 transformed_nodes.append(node)
-        return nodes + transformed_nodes
+        return documents + transformed_nodes
 
 
 def general_summarisor(prompt, text):
@@ -149,19 +182,6 @@ def general_summarisor(prompt, text):
         return response.json()
     except requests.RequestException as e:
         raise SystemExit(f"Failed to make the request. Error: {e}")
-
-
-class TextCleaner(TransformComponent):
-    def __call__(self, nodes, **kwargs):
-        print(f"Processing {len(nodes)} nodes")
-        for node in nodes:
-            if node.metadata.get("type") in ["section", "subsection"]:
-                print(f"Processing node ID: {node.metadata['id']}")
-                print(f"Original text: {node.text[:150]}...")
-                node.text = re.sub(r"[^0-9A-Za-z ]", "", node.text)
-                print(f"Cleaned text: {node.text[:150]}...")
-
-        return nodes
 
 
 # get nodes summary and save as a child node

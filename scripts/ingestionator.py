@@ -10,8 +10,10 @@ from llama_index.embeddings.azure_openai import AzureOpenAIEmbedding
 from transformator import load_env
 from documentifier import process_page_into_doc_and_nodes
 from llama_index.core.ingestion import IngestionPipeline
-from transformator import TextCleaner
+from transformator import TextCleaner, SemanticChunkingTransformation
 import re
+
+# from llama_index.core.node_parser import SemanticSplitterNodeParser
 
 
 # get env variables
@@ -41,15 +43,19 @@ embed_model = AzureOpenAIEmbedding(
 documents = process_page_into_doc_and_nodes("Python (programming language)")
 print(len(documents))
 
+# initialise the transformations
+sem_chunk = SemanticChunkingTransformation()
 
 pipeline = IngestionPipeline(
     transformations=[
+        sem_chunk,
         TextCleaner(),
     ],
 )
 
 
 test_docs = documents[:5]
+# nodes = sem_chunker(documents=test_docs, embed_model=embed_model)
 
 nodes = pipeline.run(documents=test_docs)
 

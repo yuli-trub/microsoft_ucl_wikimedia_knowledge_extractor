@@ -8,16 +8,16 @@ import io
 
 
 load_dotenv()
-GPT4o_API_KEY = os.getenv("OPENAI_API_KEY")
+AZURE_OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENAI_ENDPOINT = os.getenv("OPENAI_ENDPOINT")
-GPT4o_DEPLOYMENT_NAME = os.getenv("DEPLOYMENT_ID")
+GPT4o_DEPLOYMENT_NAME = os.getenv("GPT4O_DEPLOYMENT_ID")
 api_version = "2024-02-01"
 GPT4V_ENDPOINT = f"{OPENAI_ENDPOINT}/openai/deployments/{GPT4o_DEPLOYMENT_NAME}/chat/completions?api-version=2024-02-15-preview"
 
 
 headers = {
     "Content-Type": "application/json",
-    "api-key": GPT4o_API_KEY,
+    "api-key": AZURE_OPENAI_API_KEY,
 }
 
 # Payload test for the request from the playground

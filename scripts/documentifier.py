@@ -177,7 +177,7 @@ def process_wiki_links(wiki_links_dict, page_metadata, document_summary):
     return nodes
 
 
-# create all the nodes
+# create all the nodes - returns clean initial loaded nodes
 def process_page_into_doc_and_nodes(page_title):
 
     # fetch wiki data
@@ -235,8 +235,12 @@ def process_page_into_doc_and_nodes(page_title):
     )
     image_nodes = process_images(images, main_document.metadata, document_summary)
     table_nodes = process_tables(tables, main_document.metadata, document_summary)
-    reference_nodes = process_references(reference_dict, main_document.metadata)
-    wiki_link_nodes = process_wiki_links(wiki_links_dict, main_document.metadata)
+    reference_nodes = process_references(
+        reference_dict, main_document.metadata, document_summary
+    )
+    wiki_link_nodes = process_wiki_links(
+        wiki_links_dict, main_document.metadata, document_summary
+    )
 
     all_nodes = (
         nodes
@@ -250,6 +254,7 @@ def process_page_into_doc_and_nodes(page_title):
     return all_nodes
 
 
+# bit to test out the node creation
 documents = process_page_into_doc_and_nodes("Python (programming language)")
 
 
@@ -263,5 +268,4 @@ def check_nodes(documents, type):
             print()
 
 
-check_nodes(documents, "citation")
-# print(documents[0].metadata)
+# check_nodes(documents, "citation")

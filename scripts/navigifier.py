@@ -273,6 +273,8 @@ def process_and_save_sections(page, base_dir):
 # print(get_intro_content((get_page_content((get_wiki_page("Mount Everest"))))))
 # print(extract_section_titles(get_page_content((get_wiki_page("Mount Everest")))))
 
-# process_and_save_sections((((get_wiki_page("Mount Everest")))), "../data/content")
+# print(
+#     get_section_content((((get_wiki_page("Python (programming language)")))), "History")
+# )
 
 # print(sanitise_filename("1979/1980: Winter Himalaism"))

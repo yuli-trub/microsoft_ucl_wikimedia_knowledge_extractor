@@ -1,16 +1,16 @@
-from navigifier import (
+from wiki_crawler.navigifier import (
     get_wiki_page,
     get_intro_content,
     extract_section_titles,
     get_page_content,
     get_page_categories,
 )
-from tablifier import get_html_page, extract_tables
-from referenciator import (
+from wiki_crawler.tablifier import get_html_page, extract_tables
+from wiki_crawler.referenciator import (
     get_external_links_by_section,
     get_all_citations,
 )
-from imagifier import convert_images_to_png
+from wiki_crawler.imagifier import convert_images_to_png
 
 
 # helper function to fetch all of the cleaned data from the wiki page in a structured format

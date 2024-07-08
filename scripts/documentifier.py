@@ -1,10 +1,10 @@
-from navigifier import (
+from wiki_crawler.navigifier import (
     get_section_content,
     sanitise_filename,
 )
 
 # from transformator import general_summarisor, get_summary
-from data_fetcher import fetch_wiki_data
+from wiki_crawler.data_fetcher import fetch_wiki_data
 from node_creator import (
     create_document,
     create_text_node,

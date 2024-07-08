@@ -10,7 +10,11 @@ from llama_index.embeddings.azure_openai import AzureOpenAIEmbedding
 from transformator import load_env
 from documentifier import process_page_into_doc_and_nodes
 from llama_index.core.ingestion import IngestionPipeline
-from transformator import TextCleaner, SemanticChunkingTransformation
+from transformator import (
+    TextCleaner,
+    SemanticChunkingTransformation,
+    EntityExtractorTransformation,
+)
 import re
 
 # from llama_index.core.node_parser import SemanticSplitterNodeParser
@@ -44,20 +48,26 @@ documents = process_page_into_doc_and_nodes("Python (programming language)")
 print(len(documents))
 
 # initialise the transformations
-sem_chunk = SemanticChunkingTransformation()
+semantic_chunking = SemanticChunkingTransformation()
+entities_extractor = EntityExtractorTransformation()
 
 pipeline = IngestionPipeline(
     transformations=[
-        sem_chunk,
+        semantic_chunking,
         TextCleaner(),
+        entities_extractor,
     ],
 )
 
 
-test_docs = documents[:5]
-# nodes = sem_chunker(documents=test_docs, embed_model=embed_model)
+test_docs = documents[:3]
 
+
+# run the pipeline
 nodes = pipeline.run(documents=test_docs)
+
+# test the transformation by itself
+
 
 if not nodes:
     print("The pipeline did not return any results.")
@@ -67,5 +77,5 @@ if not nodes:
 print("Transformed Documents:")
 for i, doc in enumerate(nodes):
     print(f"Transformed Document {i+1}:")
-    print(f"ID: {doc.metadata['id']}")
+    print(f"ID: {doc.metadata}")
     print(f"Content: {doc.text[:100]}...\n")

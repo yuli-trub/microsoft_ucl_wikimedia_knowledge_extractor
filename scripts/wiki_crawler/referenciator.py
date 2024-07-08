@@ -1,5 +1,5 @@
 from mediawiki import MediaWiki
-from navigifier import get_page_sections, get_section_content
+from wiki_crawler.navigifier import get_page_sections, get_section_content
 
 
 def get_all_page_links(page):

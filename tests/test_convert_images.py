@@ -6,7 +6,7 @@ from PIL import Image
 from PIL import UnidentifiedImageError
 import io
 
-from scripts.imagifier import convert_images_to_png
+from wiki_crawler.imagifier import convert_images_to_png
 
 
 class TestConvertImagesToPng(unittest.TestCase):

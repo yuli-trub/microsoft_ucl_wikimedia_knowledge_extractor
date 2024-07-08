@@ -1,11 +1,3 @@
-# so combining..
-# 1. create transformations
-# 2. from documentifier call the function to create initial docs
-# 3. create ingestion pipeline with
-# document management  = docstore=SimpleDocumentStore()
-# vector store??? -> add final output to vectore stor
-
-
 from llama_index.embeddings.azure_openai import AzureOpenAIEmbedding
 from transformator import load_env
 from documentifier import process_page_into_doc_and_nodes
@@ -14,10 +6,23 @@ from transformator import (
     TextCleaner,
     SemanticChunkingTransformation,
     EntityExtractorTransformation,
+    SummaryTransformation,
 )
 import re
+import os
 
-# from llama_index.core.node_parser import SemanticSplitterNodeParser
+# just for now so i don't have to wait for the wiki data
+import pickle
+
+
+def save_documents_to_file(documents, filename="documents.pkl"):
+    with open(filename, "wb") as f:
+        pickle.dump(documents, f)
+
+
+def load_documents_from_file(filename="documents.pkl"):
+    with open(filename, "rb") as f:
+        return pickle.load(f)
 
 
 # get env variables
@@ -44,30 +49,39 @@ embed_model = AzureOpenAIEmbedding(
 # vecto and doc store????
 
 # get the docs and nodes
-documents = process_page_into_doc_and_nodes("Python (programming language)")
-print(len(documents))
+# documents = process_page_into_doc_and_nodes("Spider-Man")
+# print(len(documents))
+
+
+# temporary local storage to reduce wiki fetching
+filename = "documents.pkl"
+if os.path.exists(filename):
+    documents = load_documents_from_file(filename)
+    print(f"Loaded {len(documents)} documents from {filename}")
+else:
+    documents = process_page_into_doc_and_nodes("Spider-Man")
+    save_documents_to_file(documents, filename)
+    print(f"Processed and saved {len(documents)} documents")
+
 
 # initialise the transformations
 semantic_chunking = SemanticChunkingTransformation()
 entities_extractor = EntityExtractorTransformation()
+summarisor = SummaryTransformation()
 
 pipeline = IngestionPipeline(
-    transformations=[
-        semantic_chunking,
-        TextCleaner(),
-        entities_extractor,
-    ],
+    transformations=[semantic_chunking, TextCleaner(), entities_extractor, summarisor],
 )
 
 
-test_docs = documents[:3]
+test_docs = documents[:2]
 
 
 # run the pipeline
 nodes = pipeline.run(documents=test_docs)
 
 # test the transformation by itself
-
+# nodes = summarisor(test_docs)
 
 if not nodes:
     print("The pipeline did not return any results.")
@@ -77,5 +91,5 @@ if not nodes:
 print("Transformed Documents:")
 for i, doc in enumerate(nodes):
     print(f"Transformed Document {i+1}:")
-    print(f"ID: {doc.metadata}")
-    print(f"Content: {doc.text[:100]}...\n")
+    print(f"ID: {doc.metadata['id']}")
+    print(f"Content: {doc.text}...\n")

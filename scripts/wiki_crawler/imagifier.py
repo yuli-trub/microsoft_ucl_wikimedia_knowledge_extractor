@@ -160,6 +160,6 @@ def convert_images_to_png(page, min_size=(50, 50)):
 
         except requests.exceptions.RequestException as e:
             print(f"Error downloading image from URL: {image_url}. Error: {e}")
-    print(f"Total images converted: {len(png_images)}")  # todo: remove later
+    # print(f"Total images converted: {len(png_images)}")  # todo: remove later
 
     return png_images

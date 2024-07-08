@@ -1,14 +1,14 @@
-from scripts.searchinator import search_wiki
-from scripts.navigifier import (
+from wiki_crawler.searchinator import search_wiki
+from wiki_crawler.navigifier import (
     get_wiki_page,
     get_page_sections,
     get_section_content,
     process_and_save_sections,
     sanitise_filename,
 )
-from scripts.referenciator import get_all_page_links, get_references
-from scripts.imagifier import convert_images_to_png
-from scripts.tablifier import extract_tables
+from wiki_crawler.referenciator import get_all_page_links, get_references
+from wiki_crawler.imagifier import convert_images_to_png
+from wiki_crawler.tablifier import extract_tables
 from mediawiki import MediaWiki
 import os
 

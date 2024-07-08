@@ -144,10 +144,10 @@ class SemanticChunkingTransformation(TransformComponent):
         transformed_nodes = []
         splitter = Settings.text_splitter  # Use global setting
 
-        for idx, node in enumerate(documents):
+        for node in documents:
             if node.metadata.get("type") in ["section", "subsection"]:
                 chunks = splitter.get_nodes_from_documents([node])
-                for chunk in chunks:
+                for idx, chunk in enumerate(chunks):
                     chunk.metadata["id"] = f"{node.metadata['id']}_chunk_{idx}"
                     chunk.metadata["parent_id"] = node.metadata["id"]
                     chunk.metadata["type"] = "chunk"
@@ -257,17 +257,20 @@ class EntityExtractorTransformation(OpenAIBaseTransformation):
 
 
 # get nodes summary and save as a child node
-class SummaryGenerator(OpenAIBaseTransformation):
+class SummaryTransformation(OpenAIBaseTransformation):
     def __call__(self, documents, **kwargs):
         new_nodes = []
 
         for idx, node in enumerate(documents):
             if node.metadata.get("type") in ["section", "subsection"]:
                 context = node.metadata.get("context")
-                prompt = f"Summarize the following text, taking into account given context: {context}"
+                prompt = (
+                    f"Summarize the following text {node.text}, taking into account given context: {context}"
+                    "as output give a string of a brief summary (6 sentences) of the text."
+                )
 
                 response = self.openai_request(prompt, node.text)
-                summary = self.get_summary(response)
+                summary = self.get_response(response)
                 summary_node = TextNode(
                     text=summary,
                     metadata={

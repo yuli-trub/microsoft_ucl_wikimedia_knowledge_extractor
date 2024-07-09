@@ -1,22 +1,21 @@
-from openai import AzureOpenAI
-from dotenv import load_dotenv
 import os
 import requests
-import base64
-from PIL import Image
-import io
 from llama_index.core.schema import TransformComponent
 import re
 from llama_index.core.schema import TextNode
-from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.core.node_parser import SemanticSplitterNodeParser
 import logging
-from datetime import datetime
 from llama_index.embeddings.azure_openai import AzureOpenAIEmbedding
 from llama_index.core import Settings
 from pydantic import Field
-from typing import Literal
-import json
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential_jitter,
+    retry_if_exception_type,
+)
+import time
+from helper import load_env
 
 
 logging.basicConfig(
@@ -27,37 +26,23 @@ logging.basicConfig(
 )
 
 
-# get env variables
-def load_env():
-    load_dotenv()
+env_vars = load_env(
+    "AZURE_OPENAI_API_KEY",
+    "OPENAI_ENDPOINT",
+    "GPT4O_DEPLOYMENT_ID",
+    "GPT4O_API_VERSION",
+    "GPT4_ENDPOINT",
+    "EMBEDDING_DEPLOYMENT_ID",
+    "EMBEDDING_API_VERSION",
+)
 
-    AZURE_OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-    OPENAI_ENDPOINT = os.getenv("OPENAI_ENDPOINT")
-    GPT4O_DEPLOYMENT_ID = os.getenv("GPT4O_DEPLOYMENT_ID")
-    GPT4O_API_VERSION = os.getenv("GPT4O_API_VERSION")
-    GPT4_ENDPOINT = f"{OPENAI_ENDPOINT}/openai/deployments/{GPT4O_DEPLOYMENT_ID}/chat/completions?api-version={GPT4O_API_VERSION}"
-    EMBEDDING_DEPLOYMENT_ID = os.getenv("EMBEDDING_DEPLOYMENT_ID")
-    EMBEDDING_API_VERSION = os.getenv("EMBEDDING_API_VERSION")
-    return (
-        AZURE_OPENAI_API_KEY,
-        OPENAI_ENDPOINT,
-        GPT4O_DEPLOYMENT_ID,
-        GPT4O_API_VERSION,
-        GPT4_ENDPOINT,
-        EMBEDDING_DEPLOYMENT_ID,
-        EMBEDDING_API_VERSION,
-    )
-
-
-(
-    AZURE_OPENAI_API_KEY,
-    OPENAI_ENDPOINT,
-    GPT4O_DEPLOYMENT_ID,
-    GPT4O_API_VERSION,
-    GPT4_ENDPOINT,
-    EMBEDDING_DEPLOYMENT_ID,
-    EMBEDDING_API_VERSION,
-) = load_env()
+AZURE_OPENAI_API_KEY = env_vars["AZURE_OPENAI_API_KEY"]
+OPENAI_ENDPOINT = env_vars["OPENAI_ENDPOINT"]
+GPT4O_DEPLOYMENT_ID = env_vars["GPT4O_DEPLOYMENT_ID"]
+GPT4O_API_VERSION = env_vars["GPT4O_API_VERSION"]
+GPT4_ENDPOINT = env_vars["GPT4_ENDPOINT"]
+EMBEDDING_DEPLOYMENT_ID = env_vars["EMBEDDING_DEPLOYMENT_ID"]
+EMBEDDING_API_VERSION = env_vars["EMBEDDING_API_VERSION"]
 
 headers = {
     "Content-Type": "application/json",
@@ -94,15 +79,12 @@ class TextCleaner(TransformComponent):
         return nodes
 
 
-# TODO:
-# text node:
-#   - key takeaways points list
-#   - summary
-#   - if there is an event or dates - list them
-#   - list of references? - idk if i need it bc references are attached to each section anyway
-
-
 class OpenAIBaseTransformation(TransformComponent):
+    @retry(
+        wait=wait_exponential_jitter(initial=1, max=60),
+        stop=stop_after_attempt(5),
+        retry=retry_if_exception_type(requests.exceptions.RequestException),
+    )
     def openai_request(self, prompt, text, function=None):
         payload = {
             "messages": [
@@ -121,8 +103,11 @@ class OpenAIBaseTransformation(TransformComponent):
             response = requests.post(GPT4_ENDPOINT, headers=headers, json=payload)
             response.raise_for_status()
             return response.json()
-        except requests.RequestException as e:
-            raise SystemExit(f"Failed to make the request. Error: {e}")
+        except requests.exceptions.RequestException as e:
+            if response.status_code == 429:
+                logging.warning("Rate limit exceeded. Retrying...")
+                time.sleep(10)
+            raise
 
     def get_response(self, response):
         try:
@@ -282,4 +267,32 @@ class SummaryTransformation(OpenAIBaseTransformation):
                     },
                 )
                 new_nodes.append(summary_node)
+        return documents + new_nodes
+
+
+class KeyTakeawaysTransformation(OpenAIBaseTransformation):
+    def __call__(self, documents, **kwargs):
+        new_nodes = []
+
+        for idx, node in enumerate(documents):
+            if node.metadata.get("type") in ["section", "subsection"]:
+                context = node.metadata.get("context")
+                prompt = (
+                    f"Give a list of key takeaways from this text {node.text}, taking into account given context: {context}"
+                    "as output give a string of a list of key takeaways from the text."
+                )
+
+                response = self.openai_request(prompt, node.text)
+                takeways = self.get_response(response)
+                takeaways_node = TextNode(
+                    text=takeways,
+                    metadata={
+                        "id": f"{node.metadata['id']}_takeaways",
+                        "type": "key_takeaways",
+                        "source": node.metadata["source"],
+                        "parent_id": node.metadata["id"],
+                        "context": context,
+                    },
+                )
+                new_nodes.append(takeaways_node)
         return documents + new_nodes

@@ -2,6 +2,8 @@ from dotenv import load_dotenv
 import os
 import pickle
 import hashlib
+import time
+import logging
 
 
 # get env variables
@@ -36,3 +38,18 @@ def load_documents_from_file(filename="documents.pkl"):
 def generate_document_hash(document):
     document_str = str(document.metadata) + document.text
     return hashlib.sha256(document_str.encode("utf-8")).hexdigest()
+
+
+# log duration
+def log_duration(func):
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        end_time = time.time()
+        duration = end_time - start_time
+        logging.info(
+            f"Function {func.__name__} took {duration:.2f} seconds to complete"
+        )
+        return result
+
+    return wrapper

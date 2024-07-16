@@ -1,5 +1,10 @@
 from llama_index.embeddings.azure_openai import AzureOpenAIEmbedding
-from helper import load_env
+from helper import (
+    load_env,
+    log_duration,
+    save_documents_to_file,
+    load_documents_from_file,
+)
 from documentifier import process_page_into_doc_and_nodes
 from llama_index.core.ingestion import IngestionPipeline, IngestionCache
 from transformator import (
@@ -13,13 +18,10 @@ from transformator import (
 import os
 import logging
 from llama_index.llms.azure_openai import AzureOpenAI
-from llama_index.core import Settings
-import qdrant_client
-from llama_index.core import VectorStoreIndex
+from llama_index.core import Settings, VectorStoreIndex
+
+# import qdrant_client
 from qdrant_setup import setup_qdrant_client
-from llama_index.vector_stores.qdrant import QdrantVectorStore
-from llama_index.core import StorageContext
-import qdrant_client
 
 # TODO: do caching with remote chache management????
 from llama_index.storage.kvstore.redis import RedisKVStore as RedisCache
@@ -28,8 +30,12 @@ from llama_index.storage.kvstore.redis import RedisKVStore as RedisCache
 # config logging
 logging.basicConfig(
     level=logging.INFO,
+    filename="ingestionator.log",
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
+
+logger = logging.getLogger(__name__)
+
 
 # get env variables
 env_vars = load_env(
@@ -43,7 +49,6 @@ env_vars = load_env(
     "QDRANT_HOST",
 )
 
-
 AZURE_OPENAI_API_KEY = env_vars["AZURE_OPENAI_API_KEY"]
 OPENAI_ENDPOINT = env_vars["OPENAI_ENDPOINT"]
 GPT4O_DEPLOYMENT_ID = env_vars["GPT4O_DEPLOYMENT_ID"]
@@ -56,24 +61,9 @@ GPT4_ENDPOINT = f"{OPENAI_ENDPOINT}/openai/deployments/{GPT4O_DEPLOYMENT_ID}/cha
 
 
 # Set up Qdrant client
-qdrant_client = qdrant_client.QdrantClient(
-    host=QDRANT_HOST,
-    port=QDRANT_PORT,
-    # api_key="<your-qdrant-api-key>",  # Uncomment if using Qdrant Cloud
+client, vector_store, storage_context = setup_qdrant_client(
+    host=QDRANT_HOST, port=QDRANT_PORT, collection_name="napoleon_collection"
 )
-
-# Set up Qdrant vector store
-vector_store = QdrantVectorStore(
-    client=qdrant_client, collection_name="spider_man_collection"
-)
-storage_context = StorageContext.from_defaults(vector_store=vector_store)
-
-
-# Set up Qdrant client
-# client, vector_store, storage_context = setup_qdrant_client(
-#     host=QDRANT_HOST, port=QDRANT_PORT, collection_name="spider_man_collection"
-# )
-
 
 # set up embedding model
 embed_model = AzureOpenAIEmbedding(
@@ -92,14 +82,10 @@ llm = AzureOpenAI(
     azure_endpoint=GPT4_ENDPOINT,
     api_version=GPT4O_API_VERSION,
 )
-
 Settings.llm = llm
 
 
-from helper import save_documents_to_file, load_documents_from_file
-
-
-filename = "documents.pkl"
+filename = "napoleon-documents.pkl"
 
 if os.path.exists(filename):
     documents = load_documents_from_file(filename)
@@ -109,7 +95,7 @@ else:
     save_documents_to_file(documents, filename)
     print(f"Processed and saved {len(documents)} documents")
 
-# cache
+# cache - TODO - figure out remote cache with Redis
 # ingest_cache = IngestionCache(
 #     cache=RedisCache.from_host_and_port(host="127.0.0.1", port=6379),
 #     collection="my_test_cache",
@@ -138,11 +124,16 @@ pipeline = IngestionPipeline(
 )
 
 
-test_docs = documents[:5]
+test_docs = documents[:2]
 
 
 # run the pipeline
-nodes = pipeline.run(documents=test_docs, text_embed_model=embed_model)
+@log_duration
+def run_pipeline(documents, embed_model):
+    return pipeline.run(documents=documents, text_embed_model=embed_model)
+
+
+nodes = run_pipeline(test_docs, embed_model)
 
 
 # Run the pipeline and check cache
@@ -176,28 +167,21 @@ nodes = pipeline.run(documents=test_docs, text_embed_model=embed_model)
 #     print(f"Content: {doc.text[:200]}...\n")
 
 
-# Verify Qdrant collection
-collections = qdrant_client.get_collections()
-print("Collections in Qdrant:", collections)
-
-# Check vectors in the collection
-response = qdrant_client.scroll(
-    collection_name="spider_man_collection",
-    limit=10,
-)
-print("Vectors in collection:", len(response))
-
-# # delete the vectors there
-# qdrant_client.delete_all(collection_name="spider_man_collection")
-# print("All vectors deleted from the collection successfully.")
-
 # Load the index from the storage context
-# index = VectorStoreIndex.from_vector_store(
-#     vector_store=vector_store, embed_model=embed_model
-# )
+index = VectorStoreIndex.from_vector_store(
+    vector_store=vector_store, embed_model=embed_model
+)
+
 
 # # Test query
-# query_engine = index.as_query_engine(similarity_top_k=8)
-# response = query_engine.query("What is spider man like as a person?")
-# print(len(response.source_nodes))
-# print("Query Response:", response)
+@log_duration
+def test_query(index):
+    query_engine = index.as_query_engine(similarity_top_k=8)
+    response = query_engine.query("What color was the Napoleon's white horse?")
+    logger.info(f"Query Response: {response}")
+    logger.info(f"Query Response Length: {len(response.source_nodes)}")
+    return response
+
+
+response = test_query(index)
+print("Query Response:", response)

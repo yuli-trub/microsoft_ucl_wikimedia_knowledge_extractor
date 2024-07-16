@@ -20,33 +20,17 @@ from node_creator import (
 )
 from llama_index.core.schema import NodeRelationship, RelatedNodeInfo
 import logging
-import time
+from helper import log_duration
 
 
 # config logging
-logging.basicConfig(
-    level=logging.INFO,
-    filename="documentifier.log",
-    filemode="a",
-    format="%(asctime)s - %(levelname)s - %(message)s",
-)
+documentifier_logger = logging.getLogger("documentifier")
+documentifier_handler = logging.FileHandler("documentifier.log")
+documentifier_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+documentifier_handler.setFormatter(documentifier_formatter)
+documentifier_logger.addHandler(documentifier_handler)
+documentifier_logger.setLevel(logging.INFO)
 
-logger = logging.getLogger(__name__)
-
-
-# log suration
-def log_duration(func):
-    def wrapper(*args, **kwargs):
-        start_time = time.time()
-        result = func(*args, **kwargs)
-        end_time = time.time()
-        duration = end_time - start_time
-        logging.info(
-            f"Function {func.__name__} took {duration:.2f} seconds to complete"
-        )
-        return result
-
-    return wrapper
 
 
 # create main doc
@@ -308,7 +292,7 @@ def process_page_into_doc_and_nodes(page_title):
 
 
 # bit to test out the node creation
-documents = process_page_into_doc_and_nodes("Napoleon")
+# documents = process_page_into_doc_and_nodes("Napoleon")
 
 
 def check_nodes(documents, type):
@@ -323,4 +307,4 @@ def check_nodes(documents, type):
             print()
 
 
-check_nodes(documents, "section")
+# check_nodes(documents, "section")

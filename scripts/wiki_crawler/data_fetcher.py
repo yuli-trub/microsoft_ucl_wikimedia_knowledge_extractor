@@ -25,6 +25,7 @@ def fetch_wiki_data(page_title):
     sections = extract_section_titles(page_content)
     categories = get_page_categories(page)
     images = convert_images_to_png(page)
+    images = []
     page_html = get_html_page(page)
     tables = extract_tables(page_html)
     reference_dict = get_all_citations(page)

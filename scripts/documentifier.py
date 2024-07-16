@@ -18,24 +18,56 @@ from node_creator import (
     add_reference_node,
     add_citation_node,
 )
+from llama_index.core.schema import NodeRelationship, RelatedNodeInfo
+import logging
+import time
+
+
+# config logging
+logging.basicConfig(
+    level=logging.INFO,
+    filename="documentifier.log",
+    filemode="a",
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
+
+logger = logging.getLogger(__name__)
+
+
+# log suration
+def log_duration(func):
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        end_time = time.time()
+        duration = end_time - start_time
+        logging.info(
+            f"Function {func.__name__} took {duration:.2f} seconds to complete"
+        )
+        return result
+
+    return wrapper
 
 
 # create main doc
 def create_main_document(page_title, page_content, document_summary, categories):
     page_metadata = {
-        "id": sanitise_filename(page_title),
-        "title": page_title,
+        "title": sanitise_filename(page_title),
         "type": "page",
         "summary": document_summary,
         "categories": categories,
     }
-    return create_document(
+
+    document = create_document(
         title=page_title, content=page_content, metadata=page_metadata
     )
+    logging.info(f"Main document created with ID: {document.doc_id}")
+    return document
 
 
 # create section and subsection nodes
-def process_sections(sections, page_metadata, document_summary, page):
+def process_sections(sections, main_document, document_summary, page):
+    logging.info(f"Processing sections for main document: {main_document.doc_id}")
     nodes = []
     prev_section_node = None
     prev_subsection_node = None
@@ -44,9 +76,8 @@ def process_sections(sections, page_metadata, document_summary, page):
         section_content = get_section_content(page, section_title)
         if section_content:
             section_metadata = {
-                "id": f"{sanitise_filename(section_title)}",
-                "parent_id": page_metadata["id"],
-                "source": page_metadata["id"],
+                "title": f"{sanitise_filename(section_title)}",
+                "source": main_document.doc_id,
                 "type": "section",
                 "context": document_summary,
             }
@@ -56,15 +87,17 @@ def process_sections(sections, page_metadata, document_summary, page):
             prev_section_node = add_text_node(
                 nodes, section_node, prev_section_node, is_section=True
             )
+            section_node.relationships[NodeRelationship.PARENT] = RelatedNodeInfo(
+                node_id=main_document.doc_id
+            )
 
             prev_subsection_node = None
             for subsection_title in subsections:
                 subsection_content = get_section_content(page, subsection_title)
                 if subsection_content:
                     subsection_metadata = {
-                        "id": f"{sanitise_filename(subsection_title)}",
-                        "parent_id": section_metadata["id"],
-                        "source": page_metadata["id"],
+                        "title": f"{sanitise_filename(subsection_title)}",
+                        "source": main_document.doc_id,
                         "type": "subsection",
                         "context": document_summary,
                     }
@@ -74,38 +107,46 @@ def process_sections(sections, page_metadata, document_summary, page):
                     prev_subsection_node = add_text_node(
                         nodes, subsection_node, prev_subsection_node, is_section=False
                     )
+                    subsection_node.relationships[NodeRelationship.PARENT] = (
+                        RelatedNodeInfo(node_id=section_node.node_id)
+                    )
+    logging.info("Sections processed successfully")
     return nodes
 
 
 # create image nodes
-def process_images(images, page_metadata, document_summary):
+def process_images(images, main_document, document_summary):
+    logging.info(f"Processing images for main document: {main_document.doc_id}")
     nodes = []
     prev_image_node = None
     for image in images:
         image_metadata = {
-            "id": image["image_name"],
+            "title": image["image_name"],
             "type": "image",
-            "source": page_metadata["id"],
-            "parent_id": page_metadata["id"],
+            "source": main_document.doc_id,
             "context": document_summary,
         }
         image_node = create_image_node(
             image_data=image["image_data"], metadata=image_metadata
         )
         prev_image_node = add_image_node(nodes, image_node, prev_image_node)
+        image_node.relationships[NodeRelationship.PARENT] = RelatedNodeInfo(
+            node_id=main_document.doc_id
+        )
+    logging.info("Images processed successfully")
     return nodes
 
 
 # create table nodes
-def process_tables(tables, page_metadata, document_summary):
+def process_tables(tables, main_document, document_summary):
+    logging.info(f"Processing tables for main document: {main_document.doc_id}")
     nodes = []
     prev_table_node = None
     for idx, table in enumerate(tables):
         table_content = table.to_csv(index=False)
         table_metadata = {
-            "id": f"{page_metadata['id']}_table_{idx}",
-            "parent_id": page_metadata["id"],
-            "source": page_metadata["id"],
+            "title": f"{main_document.metadata['title']}_table_{idx}",
+            "source": main_document.doc_id,
             "type": "table",
             "context": document_summary,
         }
@@ -113,11 +154,16 @@ def process_tables(tables, page_metadata, document_summary):
             table_data=table_content, metadata=table_metadata
         )
         prev_table_node = add_table_node(nodes, table_node, prev_table_node)
+        table_node.relationships[NodeRelationship.PARENT] = RelatedNodeInfo(
+            node_id=main_document.doc_id
+        )
+    logging.info("Tables processed successfully")
     return nodes
 
 
 # create citation nodes
-def process_references(reference_dict, page_metadata, document_summary):
+def process_references(reference_dict, main_document, document_summary):
+    logging.info(f"Processing references for main document: {main_document.doc_id}")
     nodes = []
     prev_citation_node = None
     for section, links in reference_dict.items():
@@ -125,9 +171,9 @@ def process_references(reference_dict, page_metadata, document_summary):
             url = link[1]
             title = sanitise_filename(link[0].strip('""'))
             citation_metadata = {
-                "id": title,
+                "title": title,
                 "parent_id": sanitise_filename(section),
-                "source": page_metadata["id"],
+                "source": main_document.doc_id,
                 "type": "citation",
                 "context": document_summary,
             }
@@ -145,28 +191,30 @@ def process_references(reference_dict, page_metadata, document_summary):
                     f"archive-{url_idx + 1}" if len(urls[1]) > 1 else "archive"
                 )
                 citation_metadata = {
-                    "id": f"{title}-{unique_suffix}",
+                    "title": f"{title}-{unique_suffix}",
                     "parent_id": sanitise_filename(section),
-                    "source": page_metadata["id"],
+                    "source": main_document.doc_id,
                     "type": "archive-citation",
                 }
                 citation_node = create_citation_node(url, metadata=citation_metadata)
                 prev_citation_node = add_citation_node(
                     nodes, citation_node, prev_citation_node
                 )
+    logging.info("References processed successfully")
     return nodes
 
 
 # create wiki link nodes
-def process_wiki_links(wiki_links_dict, page_metadata, document_summary):
+def process_wiki_links(wiki_links_dict, main_document, document_summary):
+    logging.info(f"Processing wiki links for main document: {main_document.doc_id}")
     nodes = []
     prev_reference_node = None
     for section, links in wiki_links_dict.items():
         for link in links:
             reference_metadata = {
-                "id": f"{sanitise_filename(link[0])}",
+                "title": f"{sanitise_filename(link[0])}",
                 "parent_id": sanitise_filename(section),
-                "source": page_metadata["id"],
+                "source": main_document.doc_id,
                 "type": "wiki-ref",
                 "context": document_summary,
             }
@@ -174,10 +222,12 @@ def process_wiki_links(wiki_links_dict, page_metadata, document_summary):
             prev_reference_node = add_reference_node(
                 nodes, reference_node, prev_reference_node
             )
+    logging.info("Wiki links processed successfully")
     return nodes
 
 
 # create all the nodes - returns clean initial loaded nodes
+@log_duration
 def process_page_into_doc_and_nodes(page_title):
 
     # fetch wiki data
@@ -194,6 +244,7 @@ def process_page_into_doc_and_nodes(page_title):
         table_of_contents,
     ) = fetch_wiki_data(page_title)
 
+    logging.debug("Wiki data fetched successfully")
     # create summary for the whole page
     # document_summary_prompt = (
     #     "Summarize the following Wikipedia page content. "
@@ -205,6 +256,7 @@ def process_page_into_doc_and_nodes(page_title):
     #     general_summarisor(document_summary_prompt, text=page_content)
     # )
     # or
+    logging.info(f"Creating main document for page: {page_title}")
     document_summary = page.summary
 
     main_document = create_main_document(
@@ -212,34 +264,34 @@ def process_page_into_doc_and_nodes(page_title):
     )
     nodes = [main_document]
 
-    nodes = []
     prev_section_node = None
 
     # Create intro node
     if intro_content:
         intro_metadata = {
-            "id": f"{main_document.metadata['id']}_intro",
-            "parent_id": main_document.metadata["id"],
+            "title": f"{main_document.metadata['title']}_intro",
+            "parent_id": main_document.doc_id,
             "type": "section",
-            "source": main_document.metadata["id"],
+            "source": main_document.doc_id,
             "context": document_summary,
         }
         intro_node = create_text_node(content=intro_content, metadata=intro_metadata)
+        intro_node.relationships[NodeRelationship.PARENT] = RelatedNodeInfo(
+            node_id=main_document.doc_id
+        )
         prev_section_node = add_text_node(
             nodes, intro_node, prev_section_node, is_section=True
         )
 
     # Process sections, images, tables, references, and wiki links
-    section_nodes = process_sections(
-        sections, main_document.metadata, document_summary, page
-    )
-    image_nodes = process_images(images, main_document.metadata, document_summary)
-    table_nodes = process_tables(tables, main_document.metadata, document_summary)
+    section_nodes = process_sections(sections, main_document, document_summary, page)
+    image_nodes = process_images(images, main_document, document_summary)
+    table_nodes = process_tables(tables, main_document, document_summary)
     reference_nodes = process_references(
-        reference_dict, main_document.metadata, document_summary
+        reference_dict, main_document, document_summary
     )
     wiki_link_nodes = process_wiki_links(
-        wiki_links_dict, main_document.metadata, document_summary
+        wiki_links_dict, main_document, document_summary
     )
 
     all_nodes = (
@@ -250,22 +302,25 @@ def process_page_into_doc_and_nodes(page_title):
         + reference_nodes
         + wiki_link_nodes
     )
-
+    logging.info("All nodes processed successfully")
+    logging.info(f"Total nodes created: {len(all_nodes)}")
     return all_nodes
 
 
 # bit to test out the node creation
-documents = process_page_into_doc_and_nodes("Python (programming language)")
+documents = process_page_into_doc_and_nodes("Napoleon")
 
 
 def check_nodes(documents, type):
     for doc in documents:
         if "type" in doc.metadata and doc.metadata["type"] == type:
-            print(f"Node ID: {doc.metadata['id']}")
-            print(f"Node meta: {doc.metadata}")
+            print(f"Node ID: {doc.node_id}")
+            print(f"Node title: {doc.metadata['title']}")
+
+            print(f"Node meta: {doc.relationships}")
 
             # print(f"Node Content: {doc.text}")  # doc.image or doc.text
             print()
 
 
-# check_nodes(documents, "citation")
+check_nodes(documents, "section")

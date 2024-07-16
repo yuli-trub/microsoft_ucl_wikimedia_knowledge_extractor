@@ -2,7 +2,7 @@ import os
 import requests
 from llama_index.core.schema import TransformComponent
 import re
-from llama_index.core.schema import TextNode
+from llama_index.core.schema import TextNode, ImageNode
 from llama_index.core.node_parser import SemanticSplitterNodeParser
 import logging
 from llama_index.embeddings.azure_openai import AzureOpenAIEmbedding
@@ -65,16 +65,33 @@ Settings.text_splitter = SemanticSplitterNodeParser(
 )
 
 
+class EmbeddingTransformation(TransformComponent):
+    def __call__(self, documents, text_embed_model, **kwargs):
+
+        for doc in documents:
+            if isinstance(doc, TextNode):
+                embedding = text_embed_model.get_text_embedding(doc.text)
+                doc.embedding = embedding
+                logging.info(
+                    f"Generated embedding for TextNode ID {doc.metadata['id']}: {doc.embedding[:5]}..."
+                )
+            # elif isinstance(doc, ImageNode):
+            #     embedding = image_embed_model.get_image_embedding(doc.image_path)
+            #     logging.info(f"Generated embedding for ImageNode ID {doc.metadata['id']}: {embedding[:5]}...")
+            #     doc.embedding = embedding
+            return documents
+
+
 # text cleaner from llamaindex
 class TextCleaner(TransformComponent):
     def __call__(self, nodes, **kwargs):
-        print(f"Processing {len(nodes)} nodes")
+        logging.info(f"Processing {len(nodes)} nodes")
         for node in nodes:
             if node.metadata.get("type") in ["section", "subsection"]:
-                print(f"Processing node ID: {node.metadata['id']}")
-                print(f"Original text: {node.text[:150]}...")
+                logging.info(f"Processing node ID: {node.metadata['id']}")
+                logging.info(f"Original text: {node.text[:150]}...")
                 node.text = re.sub(r"[^0-9A-Za-z ]", "", node.text)
-                print(f"Cleaned text: {node.text[:150]}...")
+                logging.info(f"Cleaned text: {node.text[:150]}...")
 
         return nodes
 
@@ -224,7 +241,6 @@ class EntityExtractorTransformation(OpenAIBaseTransformation):
 
                 if response:
                     entities_json = self.get_response(response)
-                    print(entities_json)
 
                     if entities_json:
                         entity_node = TextNode(

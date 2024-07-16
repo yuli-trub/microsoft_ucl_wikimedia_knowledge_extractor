@@ -11,6 +11,7 @@ import sys
 import ctypes
 from openai import AzureOpenAI
 from dotenv import load_dotenv
+import logging
 
 load_dotenv()
 USER_AGENT = os.getenv("USER_AGENT")
@@ -22,6 +23,18 @@ try:
 except OSError as e:
     print(f"Error loading libcairo-2.dll: {e}")
 import cairosvg
+
+
+# set up logging
+imagifier_logger = logging.getLogger("imagifier")
+imagifier_handler = logging.FileHandler("imagifier.log")
+imagifier_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+imagifier_handler.setFormatter(imagifier_formatter)
+imagifier_logger.addHandler(imagifier_handler)
+imagifier_logger.setLevel(logging.INFO)
+
+
+Image.MAX_IMAGE_PIXELS = None
 
 
 def save_svg(svg_content, file_path):
@@ -69,6 +82,22 @@ def encode_image_from_memory(image_data):
     return base64.b64encode(image_data).decode("utf-8")
 
 
+def resize_image_if_large(image_data, max_pixels=178956970):
+    """Resize the image if it exceeds the max_pixels limit."""
+    try:
+        image = Image.open(io.BytesIO(image_data))
+        if image.size[0] * image.size[1] > max_pixels:
+            ratio = (max_pixels / float(image.size[0] * image.size[1])) ** 0.5
+            new_size = (int(image.size[0] * ratio), int(image.size[1] * ratio))
+            image = image.resize(new_size, Image.Resampling.LANCZOS)
+            output = io.BytesIO()
+            image.save(output, format="PNG")
+            return output.getvalue()
+    except Exception as e:
+        print(f"Error resizing image: {e}")
+    return image_data
+
+
 def convert_images_to_png(page, min_size=(50, 50)):
     """
     Download all images from a wiki page and convert them to PNG format
@@ -89,11 +118,6 @@ def convert_images_to_png(page, min_size=(50, 50)):
 
     headers = {"User-Agent": USER_AGENT}
 
-    # script_dir = os.path.dirname(os.path.abspath(__file__))
-    # images_dir = os.path.join(script_dir, "../data/images")
-    # svg_dir = os.path.join(script_dir, "../data/images/svg")
-    # png_dir = os.path.join(script_dir, "../data/images/png")
-
     png_images = []
 
     for image_url in images:
@@ -106,7 +130,7 @@ def convert_images_to_png(page, min_size=(50, 50)):
             image_name_without_ext = os.path.splitext(image_name)[0]
 
             if is_image_too_small(image_data, min_size):
-                # print(f"Skipping image {image_name} as it is too small.")
+                logging.info(f"Skipping image {image_name} as it is too small.")
                 continue
 
             if image_url.endswith(".svg"):
@@ -122,13 +146,14 @@ def convert_images_to_png(page, min_size=(50, 50)):
                             "image_name": image_name_without_ext,
                         }
                     )
-                    # print(f"Converted SVG to PNG: {image_name_without_ext}")
+                    logging.info(f"Converted SVG to PNG: {image_name_without_ext}")
                 except Exception as e:
                     print(
                         f"Error converting SVG to PNG for URL: {image_url}. Error: {e}"
                     )
             else:
                 try:
+                    image_data = resize_image_if_large(image_data)
                     image = Image.open(io.BytesIO(image_data))
                     png_buffer = io.BytesIO()
                     if image.format != "PNG":
@@ -144,7 +169,9 @@ def convert_images_to_png(page, min_size=(50, 50)):
                                 "image_name": image_name_without_ext,
                             }
                         )
-                        # print(f"Converted image to PNG: {image_name_without_ext}")
+                        logging.info(
+                            f"Converted image to PNG: {image_name_without_ext}"
+                        )
                     else:
                         png_images.append(
                             {
@@ -154,12 +181,12 @@ def convert_images_to_png(page, min_size=(50, 50)):
                                 "image_name": image_name_without_ext,
                             }
                         )
-                        # print(f"Saved PNG image: {image_name_without_ext}")
+                        logging.info(f"Saved PNG image: {image_name_without_ext}")
                 except UnidentifiedImageError:
                     print(f"Unable to identify image at URL: {image_url}")
 
         except requests.exceptions.RequestException as e:
             print(f"Error downloading image from URL: {image_url}. Error: {e}")
-    # print(f"Total images converted: {len(png_images)}")  # todo: remove later
+    logging.info(f"Total images converted: {len(png_images)}")  # todo: remove later
 
     return png_images

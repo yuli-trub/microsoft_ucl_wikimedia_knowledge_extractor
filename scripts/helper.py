@@ -1,5 +1,7 @@
 from dotenv import load_dotenv
 import os
+import pickle
+import hashlib
 
 
 # get env variables
@@ -17,3 +19,20 @@ def load_env(*keys):
         "QDRANT_HOST": os.getenv("QDRANT_HOST"),
     }
     return {key: env_vars[key] for key in keys}
+
+
+# load documents
+def save_documents_to_file(documents, filename="documents.pkl"):
+    with open(filename, "wb") as f:
+        pickle.dump(documents, f)
+
+
+def load_documents_from_file(filename="documents.pkl"):
+    with open(filename, "rb") as f:
+        return pickle.load(f)
+
+
+# generate hash
+def generate_document_hash(document):
+    document_str = str(document.metadata) + document.text
+    return hashlib.sha256(document_str.encode("utf-8")).hexdigest()

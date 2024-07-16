@@ -8,21 +8,21 @@ from transformator import (
     EntityExtractorTransformation,
     SummaryTransformation,
     KeyTakeawaysTransformation,
+    EmbeddingTransformation,
 )
-import hashlib
-import re
 import os
 import logging
 from llama_index.llms.azure_openai import AzureOpenAI
-
 from llama_index.core import Settings
-
-
-# setting up qdrant vector store
 import qdrant_client
+from llama_index.core import VectorStoreIndex
+from qdrant_setup import setup_qdrant_client
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.core import StorageContext
-from llama_index.core import VectorStoreIndex
+import qdrant_client
+
+# TODO: do caching with remote chache management????
+from llama_index.storage.kvstore.redis import RedisKVStore as RedisCache
 
 
 # config logging
@@ -52,8 +52,6 @@ EMBEDDING_DEPLOYMENT_ID = env_vars["EMBEDDING_DEPLOYMENT_ID"]
 EMBEDDING_API_VERSION = env_vars["EMBEDDING_API_VERSION"]
 QDRANT_PORT = env_vars["QDRANT_PORT"]
 QDRANT_HOST = env_vars["QDRANT_HOST"]
-
-
 GPT4_ENDPOINT = f"{OPENAI_ENDPOINT}/openai/deployments/{GPT4O_DEPLOYMENT_ID}/chat/completions?api-version={GPT4O_API_VERSION}"
 
 
@@ -71,8 +69,10 @@ vector_store = QdrantVectorStore(
 storage_context = StorageContext.from_defaults(vector_store=vector_store)
 
 
-# TODO: do caching with remote chache management????
-from llama_index.storage.kvstore.redis import RedisKVStore as RedisCache
+# Set up Qdrant client
+# client, vector_store, storage_context = setup_qdrant_client(
+#     host=QDRANT_HOST, port=QDRANT_PORT, collection_name="spider_man_collection"
+# )
 
 
 # set up embedding model
@@ -96,19 +96,7 @@ llm = AzureOpenAI(
 Settings.llm = llm
 
 
-# temporary local storage to reduce wiki fetching
-# just for now so i don't have to wait for the wiki data - persisting the created initial nodes
-import pickle
-
-
-def save_documents_to_file(documents, filename="documents.pkl"):
-    with open(filename, "wb") as f:
-        pickle.dump(documents, f)
-
-
-def load_documents_from_file(filename="documents.pkl"):
-    with open(filename, "rb") as f:
-        return pickle.load(f)
+from helper import save_documents_to_file, load_documents_from_file
 
 
 filename = "documents.pkl"
@@ -133,8 +121,9 @@ semantic_chunking = SemanticChunkingTransformation()
 entities_extractor = EntityExtractorTransformation()
 summarisor = SummaryTransformation()
 key_takeaways = KeyTakeawaysTransformation()
+embedding = EmbeddingTransformation()
 
-
+# ingestion pipeline
 pipeline = IngestionPipeline(
     transformations=[
         semantic_chunking,
@@ -142,23 +131,18 @@ pipeline = IngestionPipeline(
         entities_extractor,
         summarisor,
         key_takeaways,
-        embed_model,
+        embedding,
     ],
     # cache=ingest_cache,
     vector_store=vector_store,
 )
 
 
-test_docs = documents[:1]
+test_docs = documents[:5]
 
 
 # run the pipeline
-# nodes = pipeline.run(documents=test_docs)
-
-
-def generate_document_hash(document):
-    document_str = str(document.metadata) + document.text
-    return hashlib.sha256(document_str.encode("utf-8")).hexdigest()
+nodes = pipeline.run(documents=test_docs, text_embed_model=embed_model)
 
 
 # Run the pipeline and check cache
@@ -194,19 +178,26 @@ def generate_document_hash(document):
 
 # Verify Qdrant collection
 collections = qdrant_client.get_collections()
-# print("Collections in Qdrant:", collections)
+print("Collections in Qdrant:", collections)
 
 # Check vectors in the collection
 response = qdrant_client.scroll(
     collection_name="spider_man_collection",
     limit=10,
 )
-# print("Vectors in collection:", response)
+print("Vectors in collection:", len(response))
+
+# # delete the vectors there
+# qdrant_client.delete_all(collection_name="spider_man_collection")
+# print("All vectors deleted from the collection successfully.")
 
 # Load the index from the storage context
-index = VectorStoreIndex.from_vector_store(vector_store=vector_store)
+# index = VectorStoreIndex.from_vector_store(
+#     vector_store=vector_store, embed_model=embed_model
+# )
 
-# Test query
-query_engine = index.as_query_engine()
-response = query_engine.query("What did Spider-Man do in his early life?")
-print("Query Response:", response)
+# # Test query
+# query_engine = index.as_query_engine(similarity_top_k=8)
+# response = query_engine.query("What is spider man like as a person?")
+# print(len(response.source_nodes))
+# print("Query Response:", response)

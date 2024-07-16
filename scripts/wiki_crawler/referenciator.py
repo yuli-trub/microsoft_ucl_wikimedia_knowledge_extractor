@@ -81,7 +81,7 @@ def get_external_links_by_section(page):
     image_extensions = {".jpg", ".jpeg", ".png", ".svg", ".gif"}
 
     for section in sections:
-        if section == "References":
+        if section in ["References", "Citations"]:
             continue
         parsed_section_links = page.parse_section_links(section)
         filtered_links = [
@@ -115,7 +115,7 @@ def get_cite_note_links_by_section(page):
     cite_note_links = {}
 
     for section in sections:
-        if section == "References":
+        if section in ["References", "Citations"]:
             continue
         parsed_section_links = page.parse_section_links(section)
         filtered_links = [
@@ -147,10 +147,13 @@ def get_reference_section_links(page):
     try:
         reference_section_links = page.parse_section_links("References")
 
+        if not reference_section_links:
+            reference_section_links = page.parse_section_links("Citations")
+
     except Exception as e:
         print(f"Error retrieving references in References section: {e}")
 
-    return reference_section_links
+    return reference_section_links or []
 
 
 def map_references_to_tuples(references):

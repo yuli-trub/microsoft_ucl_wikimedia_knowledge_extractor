@@ -6,6 +6,7 @@ from llama_index.core.schema import TextNode, ImageNode
 from llama_index.core.node_parser import SemanticSplitterNodeParser
 import logging
 from llama_index.embeddings.azure_openai import AzureOpenAIEmbedding
+from llama_index.core.schema import NodeRelationship, RelatedNodeInfo
 from llama_index.core import Settings
 from pydantic import Field
 from tenacity import (
@@ -15,15 +16,17 @@ from tenacity import (
     retry_if_exception_type,
 )
 import time
-from helper import load_env
+from helper import load_env, log_duration
+
+# TODO change the source from metadata to relationship dict
 
 
-logging.basicConfig(
-    level=logging.INFO,
-    filename="pipeline.log",
-    filemode="a",
-    format="%(asctime)s - %(levelname)s - %(message)s",
-)
+transformator_logger = logging.getLogger("transformator")
+transformator_handler = logging.FileHandler("transformator.log")
+transformator_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+transformator_handler.setFormatter(transformator_formatter)
+transformator_logger.addHandler(transformator_handler)
+transformator_logger.setLevel(logging.INFO)
 
 
 env_vars = load_env(
@@ -66,32 +69,34 @@ Settings.text_splitter = SemanticSplitterNodeParser(
 
 
 class EmbeddingTransformation(TransformComponent):
+    # @log_duration
     def __call__(self, documents, text_embed_model, **kwargs):
 
         for doc in documents:
             if isinstance(doc, TextNode):
                 embedding = text_embed_model.get_text_embedding(doc.text)
                 doc.embedding = embedding
-                logging.info(
-                    f"Generated embedding for TextNode ID {doc.metadata['id']}: {doc.embedding[:5]}..."
+                transformator_logger.info(
+                    f"Generated embedding for TextNode ID {doc.metadata['title']}: {doc.embedding[:5]}..."
                 )
             # elif isinstance(doc, ImageNode):
             #     embedding = image_embed_model.get_image_embedding(doc.image_path)
-            #     logging.info(f"Generated embedding for ImageNode ID {doc.metadata['id']}: {embedding[:5]}...")
+            #     transformator_logger.info(f"Generated embedding for ImageNode ID {doc.metadata['id']}: {embedding[:5]}...")
             #     doc.embedding = embedding
             return documents
 
 
 # text cleaner from llamaindex
 class TextCleaner(TransformComponent):
+    # @log_duration
     def __call__(self, nodes, **kwargs):
-        logging.info(f"Processing {len(nodes)} nodes")
+        transformator_logger.info(f"Processing {len(nodes)} nodes")
         for node in nodes:
             if node.metadata.get("type") in ["section", "subsection"]:
-                logging.info(f"Processing node ID: {node.metadata['id']}")
-                logging.info(f"Original text: {node.text[:150]}...")
+                transformator_logger.info(f"Processing node ID: {node.node_id}")
+                transformator_logger.info(f"Original text: {node.text[:150]}...")
                 node.text = re.sub(r"[^0-9A-Za-z ]", "", node.text)
-                logging.info(f"Cleaned text: {node.text[:150]}...")
+                transformator_logger.info(f"Cleaned text: {node.text[:150]}...")
 
         return nodes
 
@@ -122,19 +127,19 @@ class OpenAIBaseTransformation(TransformComponent):
             return response.json()
         except requests.exceptions.RequestException as e:
             if response.status_code == 429:
-                logging.warning("Rate limit exceeded. Retrying...")
+                transformator_logger.warning("Rate limit exceeded. Retrying...")
                 time.sleep(10)
             raise
 
     def get_response(self, response):
         try:
             token_usage = response["usage"]["total_tokens"]
-            logging.info(f"Tokens used: {token_usage}")
+            transformator_logger.info(f"Tokens used: {token_usage}")
             cost = self.calculate_cost(token_usage)
-            logging.info(f"Estimated cost: ${cost:.2f}")
+            transformator_logger.info(f"Estimated cost: ${cost:.2f}")
             return response["choices"][0]["message"]["content"]
         except (KeyError, IndexError):
-            logging.error("Failed to retrieve summary from response.")
+            transformator_logger.error("Failed to retrieve summary from response.")
             return "Transformation failed or unclear"
 
     def calculate_cost(self, tokens):
@@ -142,16 +147,19 @@ class OpenAIBaseTransformation(TransformComponent):
 
 
 class SemanticChunkingTransformation(TransformComponent):
+    # @log_duration
     def __call__(self, documents, **kwargs):
         transformed_nodes = []
-        splitter = Settings.text_splitter  # Use global setting
+        splitter = Settings.text_splitter
 
         for node in documents:
             if node.metadata.get("type") in ["section", "subsection"]:
                 chunks = splitter.get_nodes_from_documents([node])
                 for idx, chunk in enumerate(chunks):
-                    chunk.metadata["id"] = f"{node.metadata['id']}_chunk_{idx}"
-                    chunk.metadata["parent_id"] = node.metadata["id"]
+                    chunk.metadata["title"] = f"{node.metadata['title']}_chunk_{idx}"
+                    chunk.relationships[NodeRelationship.PARENT] = RelatedNodeInfo(
+                        node_id=node.node_id
+                    )
                     chunk.metadata["type"] = "chunk"
                 transformed_nodes.extend(chunks)
             else:
@@ -229,6 +237,7 @@ class EntityExtractorTransformation(OpenAIBaseTransformation):
         alias="extract_entities",
     )
 
+    # @log_duration
     def __call__(self, documents, **kwargs):
         entities_nodes = []
         prompt = (
@@ -246,11 +255,13 @@ class EntityExtractorTransformation(OpenAIBaseTransformation):
                         entity_node = TextNode(
                             text=entities_json,
                             metadata={
-                                "id": f"{node.metadata['id']}_entities",
+                                "title": f"{node.metadata['title']}_entities",
                                 "type": "entities",
                                 "source": node.metadata["source"],
-                                "parent_id": node.metadata["id"],
                             },
+                        )
+                        entity_node.relationships[NodeRelationship.PARENT] = (
+                            RelatedNodeInfo(node_id=node.node_id)
                         )
                         entities_nodes.append(entity_node)
 
@@ -259,6 +270,7 @@ class EntityExtractorTransformation(OpenAIBaseTransformation):
 
 # get nodes summary and save as a child node
 class SummaryTransformation(OpenAIBaseTransformation):
+    # @log_duration
     def __call__(self, documents, **kwargs):
         new_nodes = []
 
@@ -266,7 +278,7 @@ class SummaryTransformation(OpenAIBaseTransformation):
             if node.metadata.get("type") in ["section", "subsection"]:
                 context = node.metadata.get("context")
                 prompt = (
-                    f"Summarize the following text {node.text}, taking into account given context: {context}"
+                    f"Summarise the following text {node.text}, taking into account given context: {context}"
                     "as output give a string of a brief summary (6 sentences) of the text."
                 )
 
@@ -275,12 +287,14 @@ class SummaryTransformation(OpenAIBaseTransformation):
                 summary_node = TextNode(
                     text=summary,
                     metadata={
-                        "id": f"{node.metadata['id']}_summary",
+                        "title": f"{node.metadata['title']}_summary",
                         "type": "summary",
                         "source": node.metadata["source"],
-                        "parent_id": node.metadata["id"],
                         "context": context,
                     },
+                )
+                summary_node.relationships[NodeRelationship.PARENT] = RelatedNodeInfo(
+                    node_id=node.node_id
                 )
                 new_nodes.append(summary_node)
         return documents + new_nodes
@@ -303,12 +317,14 @@ class KeyTakeawaysTransformation(OpenAIBaseTransformation):
                 takeaways_node = TextNode(
                     text=takeways,
                     metadata={
-                        "id": f"{node.metadata['id']}_takeaways",
+                        "title": f"{node.metadata['title']}_takeaways",
                         "type": "key_takeaways",
                         "source": node.metadata["source"],
-                        "parent_id": node.metadata["id"],
                         "context": context,
                     },
+                )
+                takeaways_node.relationships[NodeRelationship.PARENT] = RelatedNodeInfo(
+                    node_id=node.node_id
                 )
                 new_nodes.append(takeaways_node)
         return documents + new_nodes

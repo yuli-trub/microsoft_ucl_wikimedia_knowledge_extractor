@@ -91,7 +91,7 @@ if os.path.exists(filename):
     documents = load_documents_from_file(filename)
     print(f"Loaded {len(documents)} documents from {filename}")
 else:
-    documents = process_page_into_doc_and_nodes("Spider-Man")
+    documents = process_page_into_doc_and_nodes("Napoleon")
     save_documents_to_file(documents, filename)
     print(f"Processed and saved {len(documents)} documents")
 

@@ -64,26 +64,29 @@ Settings.embed_model = AzureOpenAIEmbedding(
 
 
 Settings.text_splitter = SemanticSplitterNodeParser(
-    buffer_size=1, breakpoint_percentile_threshold=80, embed_model=Settings.embed_model
+    buffer_size=1,
+    breakpoint_percentile_threshold=70,
+    max_tokens=7000,
+    embed_model=Settings.embed_model,
 )
 
 
 class EmbeddingTransformation(TransformComponent):
     # @log_duration
     def __call__(self, documents, text_embed_model, **kwargs):
-
         for doc in documents:
-            if isinstance(doc, TextNode):
-                embedding = text_embed_model.get_text_embedding(doc.text)
-                doc.embedding = embedding
-                transformator_logger.info(
-                    f"Generated embedding for TextNode ID {doc.metadata['title']}: {doc.embedding[:5]}..."
-                )
-            # elif isinstance(doc, ImageNode):
-            #     embedding = image_embed_model.get_image_embedding(doc.image_path)
-            #     transformator_logger.info(f"Generated embedding for ImageNode ID {doc.metadata['id']}: {embedding[:5]}...")
-            #     doc.embedding = embedding
-            return documents
+            if doc.metadata.get("needs_embedding"):
+                if isinstance(doc, TextNode):
+                    embedding = text_embed_model.get_text_embedding(doc.text)
+                    doc.embedding = embedding
+                    transformator_logger.info(
+                        f"Generated embedding for TextNode ID {doc.metadata['title']}: {doc.embedding[:5]}..."
+                    )
+                # elif isinstance(doc, ImageNode):
+                #     embedding = image_embed_model.get_image_embedding(doc.image_path)
+                #     transformator_logger.info(f"Generated embedding for ImageNode ID {doc.metadata['id']}: {embedding[:5]}...")
+                #     doc.embedding = embedding
+        return documents
 
 
 # text cleaner from llamaindex
@@ -154,17 +157,34 @@ class SemanticChunkingTransformation(TransformComponent):
 
         for node in documents:
             if node.metadata.get("type") in ["section", "subsection"]:
+                transformator_logger.info(
+                    f"Splitting node ID: {node.metadata['title']} with text length: {len(node.text)}"
+                )
                 chunks = splitter.get_nodes_from_documents([node])
+                transformator_logger.info(
+                    f"Generated {len(chunks)} chunks for node ID: {node.node_id}"
+                )
                 for idx, chunk in enumerate(chunks):
                     chunk.metadata["title"] = f"{node.metadata['title']}_chunk_{idx}"
                     chunk.relationships[NodeRelationship.PARENT] = RelatedNodeInfo(
                         node_id=node.node_id
                     )
                     chunk.metadata["type"] = "chunk"
-                transformed_nodes.extend(chunks)
+                    chunk.metadata["needs_embedding"] = True
+                    transformator_logger.info(
+                        f"Generated chunk ID: {chunk.metadata['title']}  with text length: {len(chunk.text)}"
+                    )
+                    transformed_nodes.append(chunk)
             else:
+                if node.metadata.get("type") not in [
+                    "entities",
+                    "summary",
+                    "key_takeaways",
+                ]:
+                    node.metadata["needs_embedding"] = False
                 transformed_nodes.append(node)
-        return documents + transformed_nodes
+
+        return transformed_nodes
 
 
 class EntityExtractorTransformation(OpenAIBaseTransformation):
@@ -258,6 +278,7 @@ class EntityExtractorTransformation(OpenAIBaseTransformation):
                                 "title": f"{node.metadata['title']}_entities",
                                 "type": "entities",
                                 "source": node.metadata["source"],
+                                "needs_embedding": True,
                             },
                         )
                         entity_node.relationships[NodeRelationship.PARENT] = (
@@ -290,6 +311,7 @@ class SummaryTransformation(OpenAIBaseTransformation):
                         "title": f"{node.metadata['title']}_summary",
                         "type": "summary",
                         "source": node.metadata["source"],
+                        "needs_embedding": True,
                         "context": context,
                     },
                 )
@@ -320,6 +342,7 @@ class KeyTakeawaysTransformation(OpenAIBaseTransformation):
                         "title": f"{node.metadata['title']}_takeaways",
                         "type": "key_takeaways",
                         "source": node.metadata["source"],
+                        "needs_embedding": True,
                         "context": context,
                     },
                 )

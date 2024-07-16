@@ -30,6 +30,7 @@ from llama_index.storage.kvstore.redis import RedisKVStore as RedisCache
 # config logging
 logging.basicConfig(
     level=logging.INFO,
+    encoding="utf-8",
     filename="ingestionator.log",
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
@@ -112,11 +113,11 @@ embedding = EmbeddingTransformation()
 # ingestion pipeline
 pipeline = IngestionPipeline(
     transformations=[
-        semantic_chunking,
         text_cleaner,
         entities_extractor,
         summarisor,
         key_takeaways,
+        semantic_chunking,
         embedding,
     ],
     # cache=ingest_cache,
@@ -124,7 +125,7 @@ pipeline = IngestionPipeline(
 )
 
 
-test_docs = documents[:2]
+test_docs = documents[:3]
 
 
 # run the pipeline
@@ -133,7 +134,14 @@ def run_pipeline(documents, embed_model):
     return pipeline.run(documents=documents, text_embed_model=embed_model)
 
 
-nodes = run_pipeline(test_docs, embed_model)
+# nodes = run_pipeline(test_docs, embed_model)
+nodes = []
+for doc in enumerate(nodes):
+    logger.info(f"ID: {doc[1].metadata['title']}")
+    logger.info(f"metadata: {doc[1].metadata}")
+    if doc[1].embedding is not None:
+        logger.info(f"embedding: {doc[1].embedding[:100]}")
+    logger.info(f"Content: {doc[1].text[:200]}...\n")
 
 
 # Run the pipeline and check cache
@@ -177,9 +185,9 @@ index = VectorStoreIndex.from_vector_store(
 @log_duration
 def test_query(index):
     query_engine = index.as_query_engine(similarity_top_k=8)
-    response = query_engine.query("What color was the Napoleon's white horse?")
+    response = query_engine.query("Where was Napoleon born?")
     logger.info(f"Query Response: {response}")
-    logger.info(f"Query Response Length: {len(response.source_nodes)}")
+    logger.info(f"Query Response nodes: {(response.source_nodes)}")
     return response
 
 

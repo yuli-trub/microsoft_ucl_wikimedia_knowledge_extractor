@@ -6,8 +6,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# was trying to fix a bug and wrote all that, but apparently it was env var typo... but this works
-
 
 def setup_qdrant_client(host, port, collection_name):
 

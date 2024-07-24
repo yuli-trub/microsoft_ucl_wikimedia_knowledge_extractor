@@ -68,7 +68,7 @@ class Neo4jClient:
             text: $text, 
             type: $type,
             title: $title,
-            
+            relationships: $relationships,
             metadata: $metadata, 
             embedding: $embedding
         })
@@ -105,9 +105,12 @@ class Neo4jClient:
     def create_relationship(
         self, from_node_id: str, to_node_id: str, relationship_type: str
     ):
+        logging.info(
+            f"Creating query with these params {relationship_type} from {from_node_id} to {to_node_id}"
+        )
         try:
             with self.driver.session() as session:
-                session.write_transaction(
+                relationship = session.write_transaction(
                     self._create_relationship,
                     from_node_id,
                     to_node_id,
@@ -116,23 +119,28 @@ class Neo4jClient:
             logging.info(
                 f"Created relationship {relationship_type} from {from_node_id} to {to_node_id}"
             )
+            return relationship
+
         except Exception as e:
             logging.error(f"Failed to create relationship: {e}")
 
     @staticmethod
     def _create_relationship(tx, from_node_id, to_node_id, relationship_type):
-        query = """
-        MATCH (a), (b)
-        WHERE elementId(a)={from_node_id} AND elementId(b)={to_node_id}
+
+        query = f"""
+        MATCH (a {{llama_node_id: $from_node_id}}), (b {{llama_node_id: $to_node_id}})
         CREATE (a)-[r:{relationship_type}]->(b)
         RETURN r
         """
-        tx.run(
+
+        result = tx.run(
             query,
             from_node_id=from_node_id,
             to_node_id=to_node_id,
             relationship_type=relationship_type,
         )
+        logging.info(f"Relationship created: {result}")
+        return result.single()["r"]
 
     def get_node(self, node_id: str) -> BaseNode:
         with self.driver.session() as session:
@@ -192,10 +200,10 @@ def node_to_metadata_dict(node: BaseNode) -> dict:
 
 # deserialise dict from graph db
 def metadata_dict_to_node(meta: dict) -> BaseNode:
-    relationships = {
-        key: RelatedNodeInfo(**value)
-        for key, value in json.loads(meta.get("relationships", "{}")).items()
-    }
+    # relationships = {
+    #     key: RelatedNodeInfo(**value)
+    #     for key, value in json.loads(meta.get("relationships", "{}")).items()
+    # }
 
     metadata = json.loads(meta["metadata"])
 
@@ -210,7 +218,7 @@ def metadata_dict_to_node(meta: dict) -> BaseNode:
             node_id=meta["llama_node_id"],
             text=meta["text"],
             metadata=json.loads(meta["metadata"]),
-            relationships=relationships,
+            # relationships=relationships,
             embedding=embedding,
         )
     if "image_path" in meta:
@@ -218,7 +226,7 @@ def metadata_dict_to_node(meta: dict) -> BaseNode:
             node_id=meta["llama_node_id"],
             image_path=meta["image_path"],
             metadata=json.loads(meta["metadata"]),
-            relationships=relationships,
+            # relationships=relationships,
             embedding=embedding,
         )
     elif "summary" in meta:
@@ -226,11 +234,9 @@ def metadata_dict_to_node(meta: dict) -> BaseNode:
         return Document(
             node_id=meta["llama_node_id"],
             metadata=metadata,
-            relationships=relationships,
+            # relationships=relationships,
             embedding=embedding,
         )
-    else:
-        return BaseNode(node_id=meta["node_id"], metadata=json.loads(meta["metadata"]))
 
 
 # test it out

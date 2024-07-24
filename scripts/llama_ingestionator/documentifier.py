@@ -23,13 +23,6 @@ import logging
 from helper import log_duration
 
 
-from logging_config import setup_logging
-
-# Setup logging
-setup_logging()
-documentifier_logger = logging.getLogger("documentifier")
-
-
 # create main doc
 def create_main_document(page_title, page_content, document_summary, categories):
     page_metadata = {

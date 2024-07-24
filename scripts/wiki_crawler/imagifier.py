@@ -27,15 +27,6 @@ except OSError as e:
 import cairosvg
 
 
-# set up logging
-imagifier_logger = logging.getLogger("imagifier")
-imagifier_handler = logging.FileHandler("imagifier.log")
-imagifier_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-imagifier_handler.setFormatter(imagifier_formatter)
-imagifier_logger.addHandler(imagifier_handler)
-imagifier_logger.setLevel(logging.INFO)
-
-
 Image.MAX_IMAGE_PIXELS = None
 
 
@@ -96,7 +87,7 @@ def resize_image_if_large(image_data, max_pixels=178956970):
             image.save(output, format="PNG")
             return output.getvalue()
     except Exception as e:
-        imagifier_logger.error(f"Error resizing image: {e}")
+        logging.error(f"Error resizing image: {e}")
     return image_data
 
 
@@ -134,7 +125,7 @@ def resize_image_if_large(image_data, max_pixels=178956970):
 #                 image_name_without_ext = os.path.splitext(image_name)[0]
 
 #                 if is_image_too_small(image_data, min_size):
-#                     imagifier_logger.info(
+#                     logging.info(
 #                         f"Skipping image {image_name} as it is too small."
 #                     )
 #                     continue
@@ -154,7 +145,7 @@ def resize_image_if_large(image_data, max_pixels=178956970):
 #                                 "image_name": image_name_without_ext,
 #                             }
 #                         )
-#                         imagifier_logger.info(
+#                         logging.info(
 #                             f"Converted SVG to PNG: {image_name_without_ext}"
 #                         )
 #                     except Exception as e:
@@ -179,7 +170,7 @@ def resize_image_if_large(image_data, max_pixels=178956970):
 #                                     "image_name": image_name_without_ext,
 #                                 }
 #                             )
-#                             imagifier_logger.info(
+#                             logging.info(
 #                                 f"Converted image to PNG: {image_name_without_ext}"
 #                             )
 #                         else:
@@ -191,7 +182,7 @@ def resize_image_if_large(image_data, max_pixels=178956970):
 #                                     "image_name": image_name_without_ext,
 #                                 }
 #                             )
-#                             imagifier_logger.info(
+#                             logging.info(
 #                                 f"Saved PNG image: {image_name_without_ext}"
 #                             )
 #                     except UnidentifiedImageError:
@@ -202,7 +193,7 @@ def resize_image_if_large(image_data, max_pixels=178956970):
 
 #         del batch
 #         gc.collect()
-#     imagifier_logger.info(
+#     logging.info(
 #         f"Total images converted: {len(png_images)}"
 #     )  # todo: remove later
 
@@ -220,20 +211,20 @@ def process_image(image_url, headers, min_size):
         image_name_without_ext = os.path.splitext(image_name)[0]
 
         if is_image_too_small(image_data, min_size):
-            imagifier_logger.info(f"Skipping image {image_name} as it is too small.")
+            logging.info(f"Skipping image {image_name} as it is too small.")
             return None
 
         if image_url.endswith(".svg"):
             preprocessed_svg = preprocess_svg(image_data.decode("utf-8"))
             try:
                 png_data = cairosvg.svg2png(bytestring=preprocessed_svg.encode("utf-8"))
-                imagifier_logger.info(f"Converted SVG to PNG: {image_name_without_ext}")
+                logging.info(f"Converted SVG to PNG: {image_name_without_ext}")
                 return {
                     "image_data": base64.b64encode(png_data).decode("utf-8"),
                     "image_name": image_name_without_ext,
                 }
             except Exception as e:
-                imagifier_logger.error(
+                logging.error(
                     f"Error converting SVG to PNG for URL: {image_url}. Error: {e}"
                 )
         else:
@@ -246,26 +237,22 @@ def process_image(image_url, headers, min_size):
                         image = image.convert("RGB")
                     image.save(png_buffer, format="PNG")
                     png_data = png_buffer.getvalue()
-                    imagifier_logger.info(
-                        f"Converted image to PNG: {image_name_without_ext}"
-                    )
+                    logging.info(f"Converted image to PNG: {image_name_without_ext}")
                     return {
                         "image_data": base64.b64encode(png_data).decode("utf-8"),
                         "image_name": image_name_without_ext,
                     }
                 else:
-                    imagifier_logger.info(f"Saved PNG image: {image_name_without_ext}")
+                    logging.info(f"Saved PNG image: {image_name_without_ext}")
                     return {
                         "image_data": base64.b64encode(image_data).decode("utf-8"),
                         "image_name": image_name_without_ext,
                     }
             except UnidentifiedImageError:
-                imagifier_logger.error(f"Unable to identify image at URL: {image_url}")
+                logging.error(f"Unable to identify image at URL: {image_url}")
 
     except requests.exceptions.RequestException as e:
-        imagifier_logger.error(
-            f"Error downloading image from URL: {image_url}. Error: {e}"
-        )
+        logging.error(f"Error downloading image from URL: {image_url}. Error: {e}")
 
     return None
 
@@ -295,5 +282,5 @@ def convert_images_to_png(page, min_size=(50, 50)):
         # Clear memory after each image
         gc.collect()
 
-    imagifier_logger.info(f"Total images converted: {len(png_images)}")
+    logging.info(f"Total images converted: {len(png_images)}")
     return png_images

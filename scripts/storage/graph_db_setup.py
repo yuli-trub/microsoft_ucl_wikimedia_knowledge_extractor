@@ -9,9 +9,7 @@ from llama_index.core.schema import RelatedNodeInfo
 
 # TODO: adapt for image nodes as well
 
-# setup logging
-graph_db_logger = logging.getLogger("graph_db")
-
+# logging = logging.getlogging()
 
 # get env vars
 env_vars = load_env("NEO4J_URI", "NEO4J_USER", "NEO4J_PASSWORD")
@@ -32,13 +30,11 @@ class Neo4jClient:
     # create a Document node
     def create_document_node(self, node: Document):
         node_data = node_to_metadata_dict(node)
-        graph_db_logger.info(
-            f"Creating Document Node with data: {node_data['metadata']}"
-        )
+        logging.info(f"Creating Document Node with data: {node_data['metadata']}")
 
         with self.driver.session() as session:
             neo_node_id = session.execute_write(self._create_document_node, node_data)
-        graph_db_logger.info(f"Document node created with neo4j ID: {neo_node_id}")
+        logging.info(f"Document node created with neo4j ID: {neo_node_id}")
         return neo_node_id
 
     @staticmethod
@@ -50,7 +46,7 @@ class Neo4jClient:
             type: $type,
             metadata: $metadata
         })
-        RETURN id(d) AS neo_node_id
+        RETURN elementId(d) AS neo_node_id
         """
         result = tx.run(query, **node_data)
         return result.single()["neo_node_id"]
@@ -58,10 +54,10 @@ class Neo4jClient:
     # create a text node
     def create_text_node(self, node: TextNode):
         node_data = node_to_metadata_dict(node)
-        # graph_db_logger.info(f"Creating Text Node with data: {node_data}")
+        # logging.info(f"Creating Text Node with data: {node_data}")
         with self.driver.session() as session:
             neo_node_id = session.execute_write(self._create_text_node, node_data)
-        graph_db_logger.info(f"Text Node created with neo4j ID: {neo_node_id}")
+        logging.info(f"Text Node created with neo4j ID: {neo_node_id}")
         return neo_node_id
 
     @staticmethod
@@ -76,7 +72,7 @@ class Neo4jClient:
             metadata: $metadata, 
             embedding: $embedding
         })
-        RETURN id(n) AS neo_node_id
+        RETURN elementId(n) AS neo_node_id
         """
         result = tx.run(query, **node_data)
         return result.single()["neo_node_id"]
@@ -86,7 +82,7 @@ class Neo4jClient:
         node_data = node_to_metadata_dict(node)
         with self.driver.session() as session:
             neo_node_id = session.execute_write(self._create_image_node, node_data)
-        graph_db_logger.info(f"ImageNode created with neo4j ID: {neo_node_id}")
+        logging.info(f"ImageNode created with neo4j ID: {neo_node_id}")
         return neo_node_id
 
     @staticmethod
@@ -101,7 +97,7 @@ class Neo4jClient:
             relationships: $relationships, 
             embedding: $embedding
         })
-        RETURN id(n) AS neo_node_id
+        RETURN elementId(n) AS neo_node_id
         """
         result = tx.run(query, **node_data)
         return result.single()["neo_node_id"]
@@ -117,17 +113,17 @@ class Neo4jClient:
                     to_node_id,
                     relationship_type,
                 )
-            graph_db_logger.info(
+            logging.info(
                 f"Created relationship {relationship_type} from {from_node_id} to {to_node_id}"
             )
         except Exception as e:
-            graph_db_logger.error(f"Failed to create relationship: {e}")
+            logging.error(f"Failed to create relationship: {e}")
 
     @staticmethod
     def _create_relationship(tx, from_node_id, to_node_id, relationship_type):
         query = """
         MATCH (a), (b)
-        WHERE ID(a)={from_node_id} AND ID(b)={to_node_id}
+        WHERE elementId(a)={from_node_id} AND elementId(b)={to_node_id}
         CREATE (a)-[r:{relationship_type}]->(b)
         RETURN r
         """
@@ -142,21 +138,26 @@ class Neo4jClient:
         with self.driver.session() as session:
             record = session.execute_read(self._get_node, node_id)
             if record is None:
-                graph_db_logger.warning(f"Node with neo4j ID {node_id} not found.")
+                logging.warning(f"Node with neo4j ID {node_id} not found.")
                 return None
             node = metadata_dict_to_node(record)
-            graph_db_logger.info(f"Node retrieved with neo4j ID: {node_id}")
+            logging.info(f"Node retrieved with neo4j ID: {node_id}")
             return node
 
     @staticmethod
     def _get_node(tx, node_id):
-        query = "MATCH (n {node_id: $node_id}) RETURN n"
+        query = """
+        MATCH (n) 
+        WHERE elementId(n)=$node_id 
+        RETURN n
+        """
         result = tx.run(query, node_id=node_id).single()
         return result["n"] if result else None
 
 
 # serialise node object
 def node_to_metadata_dict(node: BaseNode) -> dict:
+
     relationships = (
         {key: {"node_id": value.node_id} for key, value in node.relationships.items()}
         if node.relationships
@@ -198,15 +199,19 @@ def metadata_dict_to_node(meta: dict) -> BaseNode:
 
     metadata = json.loads(meta["metadata"])
 
+    embedding = (
+        np.array(meta["embedding"]).tolist()
+        if meta.get("embedding") is not None
+        else None
+    )
+
     if "text" in meta:
         return TextNode(
             node_id=meta["llama_node_id"],
             text=meta["text"],
             metadata=json.loads(meta["metadata"]),
             relationships=relationships,
-            embedding=(
-                np.array(meta["embedding"]) if meta["embedding"] is not None else None
-            ),
+            embedding=embedding,
         )
     if "image_path" in meta:
         return ImageNode(
@@ -214,9 +219,7 @@ def metadata_dict_to_node(meta: dict) -> BaseNode:
             image_path=meta["image_path"],
             metadata=json.loads(meta["metadata"]),
             relationships=relationships,
-            embedding=(
-                np.array(meta["embedding"]) if meta["embedding"] is not None else None
-            ),
+            embedding=embedding,
         )
     elif "summary" in meta:
         metadata["summary"] = meta["summary"]
@@ -224,9 +227,7 @@ def metadata_dict_to_node(meta: dict) -> BaseNode:
             node_id=meta["llama_node_id"],
             metadata=metadata,
             relationships=relationships,
-            embedding=(
-                np.array(meta["embedding"]) if meta["embedding"] is not None else None
-            ),
+            embedding=embedding,
         )
     else:
         return BaseNode(node_id=meta["node_id"], metadata=json.loads(meta["metadata"]))

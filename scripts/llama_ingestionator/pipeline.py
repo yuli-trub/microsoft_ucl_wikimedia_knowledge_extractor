@@ -15,8 +15,6 @@ from llama_index.core import Settings
 # TODO: config cache
 # TODO: add image processing later
 
-pipeline_logger = logging.getLogger("pipeline")
-
 
 def create_pipeline(vector_store):
 

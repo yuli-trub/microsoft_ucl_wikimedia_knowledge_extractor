@@ -19,11 +19,6 @@ import time
 from helper import load_env, log_duration
 
 # TODO change the source from metadata to relationship dict
-from logging_config import setup_logging
-
-# Setup logging
-setup_logging()
-transformator_logger = logging.getLogger("transformator")
 
 env_vars = load_env(
     "AZURE_OPENAI_API_KEY",
@@ -75,12 +70,12 @@ class EmbeddingTransformation(TransformComponent):
                 if isinstance(doc, TextNode):
                     embedding = text_embed_model.get_text_embedding(doc.text)
                     doc.embedding = embedding
-                    transformator_logger.info(
+                    logging.info(
                         f"Generated embedding for TextNode ID {doc.metadata['title']}: {doc.embedding[:5]}..."
                     )
                 # elif isinstance(doc, ImageNode):
                 #     embedding = image_embed_model.get_image_embedding(doc.image_path)
-                #     transformator_logger.info(f"Generated embedding for ImageNode ID {doc.metadata['id']}: {embedding[:5]}...")
+                #     logging.info(f"Generated embedding for ImageNode ID {doc.metadata['id']}: {embedding[:5]}...")
                 #     doc.embedding = embedding
         return documents
 
@@ -89,13 +84,13 @@ class EmbeddingTransformation(TransformComponent):
 class TextCleaner(TransformComponent):
     # @log_duration
     def __call__(self, nodes, **kwargs):
-        transformator_logger.info(f"Processing {len(nodes)} nodes")
+        logging.info(f"Processing {len(nodes)} nodes")
         for node in nodes:
             if node.metadata.get("type") in ["section", "subsection"]:
-                transformator_logger.info(f"Processing node ID: {node.node_id}")
-                transformator_logger.info(f"Original text: {node.text[:150]}...")
+                logging.info(f"Processing node ID: {node.node_id}")
+                logging.info(f"Original text: {node.text[:150]}...")
                 node.text = re.sub(r"[^0-9A-Za-z ]", "", node.text)
-                transformator_logger.info(f"Cleaned text: {node.text[:150]}...")
+                logging.info(f"Cleaned text: {node.text[:150]}...")
 
         return nodes
 
@@ -103,7 +98,7 @@ class TextCleaner(TransformComponent):
 class OpenAIBaseTransformation(TransformComponent):
     @retry(
         wait=wait_exponential_jitter(initial=1, max=60),
-        stop=stop_after_attempt(5),
+        stop=stop_after_attempt(10),
         retry=retry_if_exception_type(requests.exceptions.RequestException),
     )
     def openai_request(self, prompt, text, function=None):
@@ -120,25 +115,26 @@ class OpenAIBaseTransformation(TransformComponent):
             payload["functions"] = [function]
             payload["function_call"] = {"name": function["name"]}
 
+        response = None
         try:
             response = requests.post(GPT4_ENDPOINT, headers=headers, json=payload)
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
-            if response.status_code == 429:
-                transformator_logger.warning("Rate limit exceeded. Retrying...")
+            if response and response.status_code == 429:
+                logging.warning("Rate limit exceeded. Retrying...")
                 time.sleep(10)
             raise
 
     def get_response(self, response):
         try:
             token_usage = response["usage"]["total_tokens"]
-            transformator_logger.info(f"Tokens used: {token_usage}")
+            logging.info(f"Tokens used: {token_usage}")
             cost = self.calculate_cost(token_usage)
-            transformator_logger.info(f"Estimated cost: ${cost:.2f}")
+            logging.info(f"Estimated cost: ${cost:.2f}")
             return response["choices"][0]["message"]["content"]
         except (KeyError, IndexError):
-            transformator_logger.error("Failed to retrieve summary from response.")
+            logging.error("Failed to retrieve summary from response.")
             return "Transformation failed or unclear"
 
     def calculate_cost(self, tokens):
@@ -153,11 +149,11 @@ class SemanticChunkingTransformation(TransformComponent):
 
         for node in documents:
             if node.metadata.get("type") in ["section", "subsection"]:
-                transformator_logger.info(
+                logging.info(
                     f"Splitting node ID: {node.metadata['title']} with text length: {len(node.text)}"
                 )
                 chunks = splitter.get_nodes_from_documents([node])
-                transformator_logger.info(
+                logging.info(
                     f"Generated {len(chunks)} chunks for node ID: {node.node_id}"
                 )
                 for idx, chunk in enumerate(chunks):
@@ -167,7 +163,7 @@ class SemanticChunkingTransformation(TransformComponent):
                     )
                     chunk.metadata["type"] = "chunk"
                     chunk.metadata["needs_embedding"] = True
-                    transformator_logger.info(
+                    logging.info(
                         f"Generated chunk ID: {chunk.metadata['title']}  with text length: {len(chunk.text)}"
                     )
                     transformed_nodes.append(chunk)
@@ -261,6 +257,7 @@ class EntityExtractorTransformation(OpenAIBaseTransformation):
             "and provide the output in the specified JSON format with type, name, and short description of what the entity represents taken from the text for each entity."
         )
         for idx, node in enumerate(documents):
+            logging.info(f"Extracting entities from node ID: {node.node_id}")
             if node.metadata.get("type") in ["section", "subsection"]:
                 response = self.openai_request(prompt, node.text)
 
@@ -281,7 +278,7 @@ class EntityExtractorTransformation(OpenAIBaseTransformation):
                             RelatedNodeInfo(node_id=node.node_id)
                         )
                         entities_nodes.append(entity_node)
-
+        logging.info(f"Extracted entities")
         return documents + entities_nodes
 
 
@@ -293,6 +290,7 @@ class SummaryTransformation(OpenAIBaseTransformation):
 
         for idx, node in enumerate(documents):
             if node.metadata.get("type") in ["section", "subsection"]:
+                logging.info(f"Summarising node ID: {node.node_id}")
                 context = node.metadata.get("context")
                 prompt = (
                     f"Summarise the following text {node.text}, taking into account given context: {context}"
@@ -324,6 +322,7 @@ class KeyTakeawaysTransformation(OpenAIBaseTransformation):
 
         for idx, node in enumerate(documents):
             if node.metadata.get("type") in ["section", "subsection"]:
+                logging.info(f"Extracting key takeaways from node ID: {node.node_id}")
                 context = node.metadata.get("context")
                 prompt = (
                     f"Give a list of key takeaways from this text {node.text}, taking into account given context: {context}"

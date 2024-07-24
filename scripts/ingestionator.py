@@ -23,11 +23,12 @@ from storage.qdrant_setup import setup_qdrant_client
 from storage.graph_db_setup import Neo4jClient
 
 
-# Import the logging configuration
-from logging_config import setup_logging
-
-# Setup logging
-logger = logging.getLogger("ingestionator")
+logging.basicConfig(
+    level=logging.INFO,
+    encoding="utf-8",
+    filename="app.log",
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
 
 
 # get env variables
@@ -100,8 +101,8 @@ else:
 
 # run pipeline
 test_docs = documents[:3]
-pipeline = create_pipeline(vector_store)
-test_nodes = run_pipeline(test_docs, pipeline, embed_model)
+# pipeline = create_pipeline(vector_store)
+# test_nodes = run_pipeline(test_docs, pipeline, embed_model)
 
 
 def store_nodes_and_relationships(test_nodes, neo4j_client):
@@ -109,44 +110,48 @@ def store_nodes_and_relationships(test_nodes, neo4j_client):
 
     for node in test_nodes:
         if isinstance(node, Document):
-            logger.info(f"Creating document node {node.doc_id}")
+            # logging.info(f"Creating document node {node.doc_id}")
             neo_node_id = neo4j_client.create_document_node(node)
             node_id_map[node.doc_id] = neo_node_id
         elif isinstance(node, TextNode) and not isinstance(node, Document):
-            logger.info(f"Creating text node {node.node_id}")
+            # logging.info(f"Creating text node {node.node_id}")
             neo_node_id = neo4j_client.create_text_node(node)
             node_id_map[node.node_id] = neo_node_id
         elif isinstance(node, ImageNode):
-            logger.info(f"Creating image node {node.node_id}")
+            # logging.info(f"Creating image node {node.node_id}")
             neo_node_id = neo4j_client.create_image_node(node)
             node_id_map[node.node_id] = neo_node_id
 
-    logger.info(f"Nodes created in Neo4j {node_id_map}")
+    # logging.info(f"Nodes created in Neo4j {node_id_map}")
 
     for node in test_nodes:
         if node.relationships:
-            logger.info(f"Creating relationships for node {node.node_id}")
+            # logging.info(f"Creating relationships for node {node.node_id}")
             for relationship, related_node_info in node.relationships.items():
                 from_id = node.node_id
                 to_id = node_id_map.get(related_node_info.node_id)
                 if to_id:
                     neo4j_client.create_relationship(from_id, to_id, relationship)
 
-    logger.info("Nodes and relationships created in Neo4j")
+    # logging.info("Nodes and relationships created in Neo4j")
 
     return node_id_map
 
 
-id_map = store_nodes_and_relationships(test_nodes, neo4j_client)
-logger.info(f"Node ID Map: {id_map}")
+# id_map = store_nodes_and_relationships(test_nodes, neo4j_client)
+# logging.info(f"Node ID Map: {id_map}")
+
+
+retrieved_node = neo4j_client.get_node("4:eaeebcfd-9ba7-47c2-b9aa-89e51fc1409e:28")
+logging.info(f"retrieved node: {retrieved_node.metadata}")
 
 # log results
 # for doc in enumerate(test_nodes):
-#     logger.info(f"ID: {doc[1].metadata['title']}")
-#     logger.info(f"metadata: {doc[1].metadata}")
+#     logging.info(f"ID: {doc[1].metadata['title']}")
+#     logging.info(f"metadata: {doc[1].metadata}")
 #     if doc[1].embedding is not None:
-#         logger.info(f"embedding: {doc[1].embedding[:100]}")
-#     logger.info(f"Content: {doc[1].text[:200]}...\n")
+#         logging.info(f"embedding: {doc[1].embedding[:100]}")
+#     logging.info(f"Content: {doc[1].text[:200]}...\n")
 
 
 # Load the index from the storage context
@@ -160,8 +165,8 @@ logger.info(f"Node ID Map: {id_map}")
 # def test_query(index):
 #     query_engine = index.as_query_engine(similarity_top_k=8)
 #     response = query_engine.query("Where was Napoleon born?")
-#     logger.info(f"Query Response: {response}")
-#     logger.info(f"Query Response nodes: {(response.source_nodes)}")
+#     logging.info(f"Query Response: {response}")
+#     logging.info(f"Query Response nodes: {(response.source_nodes)}")
 #     return response
 
 

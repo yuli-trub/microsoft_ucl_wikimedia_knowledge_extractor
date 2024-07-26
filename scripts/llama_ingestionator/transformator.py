@@ -176,7 +176,7 @@ class SemanticChunkingTransformation(TransformComponent):
                     node.metadata["needs_embedding"] = False
                 transformed_nodes.append(node)
 
-        return documents + transformed_nodes
+        return transformed_nodes
 
 
 class EntityExtractorTransformation(OpenAIBaseTransformation):

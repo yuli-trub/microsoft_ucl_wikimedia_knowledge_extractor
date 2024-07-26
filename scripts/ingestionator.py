@@ -100,12 +100,13 @@ else:
 
 
 # run pipeline
-test_docs = documents[:2]
+test_docs = documents[:3]
 pipeline = create_pipeline(vector_store)
 test_nodes = run_pipeline(test_docs, pipeline, embed_model)
 
 
 def store_nodes_and_relationships(test_nodes, neo4j_client):
+    logging.info(f"nodes: {(len(test_nodes))}")
     node_id_map = {}
 
     for node in test_nodes:
@@ -124,23 +125,23 @@ def store_nodes_and_relationships(test_nodes, neo4j_client):
 
     logging.info(f"Nodes created in Neo4j {node_id_map}")
 
-    for node in test_nodes:
-        if node.relationships:
+    # for node in test_nodes:
+    #     if node.relationships:
 
-            logging.info(f"Creating relationships for node {node.node_id}")
-            for relationship, related_node_info in node.relationships.items():
+    #         logging.info(f"Creating relationships for node {node.node_id}")
+    #         for relationship, related_node_info in node.relationships.items():
 
-                relationship_type = relationship.name
-                logging.info(
-                    f"Creating relationship {relationship_type} to {related_node_info.node_id}"
-                )
-                to_id = node.node_id
-                from_id = related_node_info.node_id
-                if to_id:
-                    check_relationship = neo4j_client.create_relationship(
-                        from_id, to_id, relationship_type
-                    )
-                    logging.info(f"Relationship created: {check_relationship}")
+    #             relationship_type = relationship.name
+    #             logging.info(
+    #                 f"Creating relationship {relationship_type} to {related_node_info.node_id}"
+    #             )
+    #             to_id = node.node_id
+    #             from_id = related_node_info.node_id
+    #             if to_id:
+    #                 check_relationship = neo4j_client.create_relationship(
+    #                     from_id, to_id, relationship_type
+    #                 )
+    #                 logging.info(f"Relationship created: {check_relationship}")
 
     # logging.info("Nodes and relationships created in Neo4j")
 
@@ -151,8 +152,8 @@ id_map = store_nodes_and_relationships(test_nodes, neo4j_client)
 logging.info(f"Node ID Map: {id_map}")
 
 
-retrieved_node = neo4j_client.get_node("4:eaeebcfd-9ba7-47c2-b9aa-89e51fc1409e:28")
-logging.info(f"retrieved node: {retrieved_node}")
+# retrieved_node = neo4j_client.get_node("4:eaeebcfd-9ba7-47c2-b9aa-89e51fc1409e:28")
+# logging.info(f"retrieved node: {retrieved_node}")
 
 # log results
 # for doc in enumerate(test_nodes):

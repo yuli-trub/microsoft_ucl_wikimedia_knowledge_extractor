@@ -30,7 +30,7 @@ class Neo4jClient:
     # create a Document node
     def create_document_node(self, node: Document):
         node_data = node_to_metadata_dict(node)
-        logging.info(f"Creating Document Node with data: {node_data['metadata']}")
+        # logging.info(f"Creating Document Node with data: {node_data['metadata']}")
 
         with self.driver.session() as session:
             neo_node_id = session.execute_write(self._create_document_node, node_data)
@@ -72,7 +72,7 @@ class Neo4jClient:
             metadata: $metadata, 
             embedding: $embedding
         })
-        RETURN elementId(n) AS neo_node_id
+        RETURN elementId(n) AS neo_node_id, n.llama_node_id AS llama_node_id
         """
         result = tx.run(query, **node_data)
         return result.single()["neo_node_id"]
@@ -142,7 +142,7 @@ class Neo4jClient:
         logging.info(f"Relationship created: {result}")
         return result.single()["r"]
 
-    def get_node(self, node_id: str) -> BaseNode:
+    def get_node_by_neo_id(self, node_id: str) -> BaseNode:
         with self.driver.session() as session:
             record = session.execute_read(self._get_node, node_id)
             if record is None:
@@ -153,10 +153,30 @@ class Neo4jClient:
             return node
 
     @staticmethod
-    def _get_node(tx, node_id):
+    def get_node_by_neo_id(tx, node_id):
         query = """
         MATCH (n) 
         WHERE elementId(n)=$node_id 
+        RETURN n
+        """
+        result = tx.run(query, node_id=node_id).single()
+        return result["n"] if result else None
+
+    def get_node_by_llama_id(self, node_id: str) -> BaseNode:
+        with self.driver.session() as session:
+            record = session.execute_read(self._get_node, node_id)
+            if record is None:
+                logging.warning(f"Node with neo4j ID {node_id} not found.")
+                return None
+            node = metadata_dict_to_node(record)
+            logging.info(f"Node retrieved with neo4j ID: {node_id}")
+            return node
+
+    @staticmethod
+    def get_node_by_llama_id(tx, node_id):
+        query = """
+        MATCH (n) 
+        WHERE n.llama_node_id=$node_id 
         RETURN n
         """
         result = tx.run(query, node_id=node_id).single()

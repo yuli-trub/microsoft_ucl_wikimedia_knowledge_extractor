@@ -54,16 +54,20 @@ class Neo4jClient:
     # create a text node
     def create_text_node(self, node: TextNode):
         node_data = node_to_metadata_dict(node)
+        label = node_data["type"].capitalize()
+        logging.info(f"label: {label}")
         # logging.info(f"Creating Text Node with data: {node_data}")
         with self.driver.session() as session:
-            neo_node_id = session.execute_write(self._create_text_node, node_data)
+            neo_node_id = session.execute_write(
+                self._create_text_node, node_data, label
+            )
         logging.info(f"Text Node created with neo4j ID: {neo_node_id}")
         return neo_node_id
 
     @staticmethod
-    def _create_text_node(tx, node_data):
-        query = """
-        CREATE (n:TextNode {
+    def _create_text_node(tx, node_data, label):
+        query = f"""
+        CREATE (n:{label} {{
             llama_node_id: $llama_node_id, 
             text: $text, 
             type: $type,
@@ -71,7 +75,7 @@ class Neo4jClient:
             relationships: $relationships,
             metadata: $metadata, 
             embedding: $embedding
-        })
+        }})
         RETURN elementId(n) AS neo_node_id, n.llama_node_id AS llama_node_id
         """
         result = tx.run(query, **node_data)

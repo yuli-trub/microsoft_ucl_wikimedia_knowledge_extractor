@@ -156,6 +156,7 @@ class SemanticChunkingTransformation(TransformComponent):
                 logging.info(
                     f"Generated {len(chunks)} chunks for node ID: {node.node_id}"
                 )
+                transformed_nodes.append(node)
                 for idx, chunk in enumerate(chunks):
                     chunk.metadata["title"] = f"{node.metadata['title']}_chunk_{idx}"
                     chunk.relationships[NodeRelationship.PARENT] = RelatedNodeInfo(

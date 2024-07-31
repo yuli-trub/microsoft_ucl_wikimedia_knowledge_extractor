@@ -80,10 +80,5 @@ class StorageManager:
             limit=top_k,
         )
 
-    def get_llama_node_ids_from_points(self, search_results):
-        llama_node_ids = [result.payload["llama_node_id"] for result in search_results]
-        logging.info(f"Llama Node IDs: {llama_node_ids}")
-        return llama_node_ids
-
     def close(self):
         self.neo4j_client.close()

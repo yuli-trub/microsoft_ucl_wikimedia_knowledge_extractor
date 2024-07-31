@@ -162,7 +162,8 @@ class Neo4jClient:
         result = tx.run(query, node_id=node_id).single()
         return result["n"] if result else None
 
-    def get_node_by_llama_id(self, node_id: str) -> BaseNode:
+    def get_node_by_llama_id(self, node_id: str):
+        logging.info(f"Tryig to retrieve node with Llama ID: {node_id}")
         with self.driver.session() as session:
             record = session.execute_read(self._get_node, node_id)
             if record is None:
@@ -188,12 +189,13 @@ class Neo4jClient:
             if record is None:
                 logging.warning(f"Parent node for Llama ID {node_id} not found.")
                 return None
-            return record
+            parent_node = metadata_dict_to_node(record)
+            return parent_node
 
     @staticmethod
     def _get_parent_node(tx, node_id):
         query = """
-        MATCH (n {llama_node_id: $node_id})-[:PARENT]->(parent)
+        MATCH (parent)-[:PARENT]->(n {llama_node_id: $node_id})
         WHERE parent.type IN ['section', 'subsection']
         RETURN parent
         """

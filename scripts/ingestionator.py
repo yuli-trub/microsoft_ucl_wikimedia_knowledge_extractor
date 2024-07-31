@@ -12,6 +12,7 @@ from llama_index.llms.azure_openai import AzureOpenAI
 from llama_index.core import Settings
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.core import VectorStoreIndex
+from llama_index.core import PromptTemplate
 
 # import pipeline
 from llama_ingestionator.pipeline import create_pipeline, run_pipeline
@@ -22,6 +23,7 @@ from storage.qdrant_setup import setup_qdrant_client
 
 # import retriever
 from retriever.retrievifier import Retriever
+
 
 # TODO: fix the links with new API call
 
@@ -127,22 +129,55 @@ index = VectorStoreIndex.from_vector_store(vector_store, embed_model=embed_model
 
 
 # retrieval stage
-
+retriever = Retriever(storage_manager, embed_model)
 
 # Example question
 question = "What is Climate Change?"
 
-logging.info(f"Converting question to embedding vector: {question}")
-query_vector = embed_model.get_query_embedding(question)
-logging.info(f"Query vector: {query_vector}")
-
-# Perform retrieval using the vector store
-logging.info("Starting retrieval process")
-search_results = storage_manager.vector_search(query_vector, top_k=10)
-logging.info(f"Retrieved search results: {search_results}")
+# this doesn't work idk why yet - says missing positional argument
+# neo_nodes = retriever.retrieve_nodes_from_neo4j(llama_ids)
+# logging.info(f"Retrieved nodes: {neo_nodes}")
 
 
-llama_ids = storage_manager.get_llama_node_ids_from_points(search_results)
-logging.info(f"LLAMA IDs: {llama_ids}")
+parent_nodes = retriever.retrieve(question, top_k=10)
+logging.info(f"Retrieved nodes and parent nodes: {parent_nodes}")
+
+
+# get text from parent nodes
+texts = [node.text for node in parent_nodes if hasattr(node, "text")]
+combined_text = " ".join(texts)
+logging.info(f"Texts from parent nodes: {texts}")
+
+
+# llm input
+llm_rag_input = f"Context: {combined_text}\n\nQuestion: {question}\n\nAnswer:"
+llm_input = f"Question: {question}\n\nAnswer:"
+
+
+qa_tmpl_str = (
+    "Context information is below.\n"
+    "---------------------\n"
+    "{context_str}\n"
+    "---------------------\n"
+    "Given the context information and not prior knowledge, "
+    "answer the query.\n"
+    "Query: {query_str}\n"
+    "Answer: "
+)
+qa_tmpl = PromptTemplate(qa_tmpl_str)
+
+query_engine = index.as_query_engine(multi_modal_llm=llm, text_qa_template=qa_tmpl)
+
+prompts_dict = query_engine.get_prompts()
+logging.info(prompts_dict)
+
+# Query with context
+
+enhanced_response = query_engine.query(llm_rag_input)
+standard_response = query_engine.query(llm_input)
+
+# Log and print both responses for comparison
+logging.info(f"Enhanced Response: {enhanced_response}")
+logging.info(f"Standard Response: {standard_response}")
 
 storage_manager.close()

@@ -36,8 +36,6 @@ def create_pipeline(vector_store):
             semantic_chunking,
             embedding,
         ],
-        # cache=ingest_cache,
-        vector_store=vector_store,
     )
 
     return pipeline

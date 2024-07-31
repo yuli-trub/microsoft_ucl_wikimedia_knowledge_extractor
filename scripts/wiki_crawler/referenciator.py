@@ -1,5 +1,6 @@
 from mediawiki import MediaWiki
-from wiki_crawler.navigifier import get_page_sections, get_section_content
+from scripts.wiki_crawler.navigifier import get_page_sections, get_section_content
+import logging
 
 
 def get_all_page_links(page):
@@ -117,14 +118,26 @@ def get_cite_note_links_by_section(page):
     for section in sections:
         if section in ["References", "Citations"]:
             continue
-        parsed_section_links = page.parse_section_links(section)
-        filtered_links = [
-            link[0].strip("[]")
-            for link in parsed_section_links
-            if "cite_note" in link[1]
-        ]
-        if filtered_links:
-            cite_note_links[section] = filtered_links
+        logging.info(f"Processing section: {section}")
+        try:
+            parsed_section_links = page.parse_section_links(section)
+            logging.info(f"parsed_section_links: {parsed_section_links}")
+
+            if parsed_section_links is None:
+                logging.warning(f"No links found in section: {section}")
+                continue
+
+            filtered_links = [
+                link[0].strip("[]")
+                for link in parsed_section_links
+                if "cite_note" in link[1]
+            ]
+            logging.info(f"filtered_links for '{section}': {filtered_links}")
+
+            if filtered_links:
+                cite_note_links[section] = filtered_links
+        except Exception as e:
+            logging.error(f"Error processing section '{section}': {e}")
 
     return cite_note_links
 
@@ -256,10 +269,11 @@ def create_section_links_dict(sections_with_refs, mapped_references):
 
 
 def get_all_citations(page):
-    citations = create_section_links_dict(
-        get_cite_note_links_by_section(page),
-        (map_references_to_tuples(get_reference_section_links(page))),
-    )
+    sections_with_refs = get_cite_note_links_by_section(page)
+    mapped_references = map_references_to_tuples(get_reference_section_links(page))
+    logging.info(f"sections_with_refs: {sections_with_refs}")
+    logging.info(f"mapped_references: {mapped_references}")
+    citations = create_section_links_dict(sections_with_refs, mapped_references)
     return citations
 
 

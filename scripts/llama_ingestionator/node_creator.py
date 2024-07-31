@@ -40,14 +40,18 @@ def add_text_node(nodes, node, prev_node, is_section=True):
             prev_node.relationships[NodeRelationship.NEXT] = RelatedNodeInfo(
                 node_id=node.node_id
             )
-            node.relationships[NodeRelationship.PREVIOUS] = prev_node.node_id
+            node.relationships[NodeRelationship.PREVIOUS] = RelatedNodeInfo(
+                node_id=prev_node.node_id
+            )
         prev_node = node
     else:
         if prev_node:
             prev_node.relationships[NodeRelationship.NEXT] = RelatedNodeInfo(
                 node_id=node.node_id
             )
-            node.relationships[NodeRelationship.PREVIOUS] = prev_node.node_id
+            node.relationships[NodeRelationship.PREVIOUS] = RelatedNodeInfo(
+                node_id=prev_node.node_id
+            )
         prev_node = node
     nodes.append(node)
     return prev_node
@@ -58,7 +62,9 @@ def add_image_node(nodes, node, prev_node):
         prev_node.relationships[NodeRelationship.NEXT] = RelatedNodeInfo(
             node_id=node.node_id
         )
-        node.relationships[NodeRelationship.PREVIOUS] = prev_node.node_id
+        node.relationships[NodeRelationship.PREVIOUS] = RelatedNodeInfo(
+            node_id=prev_node.node_id
+        )
     prev_node = node
     nodes.append(node)
     return prev_node
@@ -69,7 +75,9 @@ def add_table_node(nodes, node, prev_node):
         prev_node.relationships[NodeRelationship.NEXT] = RelatedNodeInfo(
             node_id=node.node_id
         )
-        node.relationships[NodeRelationship.PREVIOUS] = prev_node.node_id
+        node.relationships[NodeRelationship.PREVIOUS] = RelatedNodeInfo(
+            node_id=prev_node.node_id
+        )
     prev_node = node
     nodes.append(node)
     return prev_node
@@ -80,7 +88,9 @@ def add_reference_node(nodes, node, prev_node):
         prev_node.relationships[NodeRelationship.NEXT] = RelatedNodeInfo(
             node_id=node.node_id
         )
-        node.relationships[NodeRelationship.PREVIOUS] = prev_node.node_id
+        node.relationships[NodeRelationship.PREVIOUS] = RelatedNodeInfo(
+            node_id=prev_node.node_id
+        )
     prev_node = node
     nodes.append(node)
     return prev_node
@@ -91,7 +101,9 @@ def add_citation_node(nodes, node, prev_node):
         prev_node.relationships[NodeRelationship.NEXT] = RelatedNodeInfo(
             node_id=node.node_id
         )
-        node.relationships[NodeRelationship.PREVIOUS] = prev_node.node_id
+        node.relationships[NodeRelationship.PREVIOUS] = RelatedNodeInfo(
+            node_id=prev_node.node_id
+        )
     prev_node = node
     nodes.append(node)
     return prev_node

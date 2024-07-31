@@ -1,10 +1,16 @@
-from wiki_crawler.navigifier import (
+import sys
+import os
+
+# Add the project root to sys.path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
+
+from scripts.wiki_crawler.navigifier import (
     get_section_content,
     sanitise_filename,
 )
 
 # from transformator import general_summarisor, get_summary
-from wiki_crawler.data_fetcher import fetch_wiki_data
+from scripts.wiki_crawler.data_fetcher import fetch_wiki_data
 from llama_ingestionator.node_creator import (
     create_document,
     create_text_node,
@@ -45,6 +51,7 @@ def process_sections(sections, main_document, document_summary, page):
     nodes = []
     prev_section_node = None
     prev_subsection_node = None
+    section_node_map = {}
 
     for section_title, subsections in sections:
         section_content = get_section_content(page, section_title)
@@ -64,6 +71,11 @@ def process_sections(sections, main_document, document_summary, page):
             section_node.relationships[NodeRelationship.PARENT] = RelatedNodeInfo(
                 node_id=main_document.doc_id
             )
+            section_node.relationships[NodeRelationship.SOURCE] = RelatedNodeInfo(
+                node_id=main_document.doc_id
+            )
+
+            section_node_map[section_title] = section_node.node_id
 
             prev_subsection_node = None
             for subsection_title in subsections:
@@ -84,8 +96,10 @@ def process_sections(sections, main_document, document_summary, page):
                     subsection_node.relationships[NodeRelationship.PARENT] = (
                         RelatedNodeInfo(node_id=section_node.node_id)
                     )
+                    section_node_map[subsection_title] = section_node.node_id
+
     logging.info("Sections processed successfully")
-    return nodes
+    return nodes, section_node_map
 
 
 # create image nodes
@@ -105,6 +119,9 @@ def process_images(images, main_document, document_summary):
         )
         prev_image_node = add_image_node(nodes, image_node, prev_image_node)
         image_node.relationships[NodeRelationship.PARENT] = RelatedNodeInfo(
+            node_id=main_document.doc_id
+        )
+        image_node.relationships[NodeRelationship.SOURCE] = RelatedNodeInfo(
             node_id=main_document.doc_id
         )
     logging.info("Images processed successfully")
@@ -131,16 +148,22 @@ def process_tables(tables, main_document, document_summary):
         table_node.relationships[NodeRelationship.PARENT] = RelatedNodeInfo(
             node_id=main_document.doc_id
         )
+        table_node.relationships[NodeRelationship.SOURCE] = RelatedNodeInfo(
+            node_id=main_document.doc_id
+        )
     logging.info("Tables processed successfully")
     return nodes
 
 
 # create citation nodes
-def process_references(reference_dict, main_document, document_summary):
+def process_references(
+    reference_dict, main_document, document_summary, section_node_map
+):
     logging.info(f"Processing references for main document: {main_document.doc_id}")
     nodes = []
     prev_citation_node = None
     for section, links in reference_dict.items():
+        parent_node_id = section_node_map.get(section)
         for link in links["actual_links"]:
             url = link[1]
             title = sanitise_filename(link[0].strip('""'))
@@ -154,6 +177,12 @@ def process_references(reference_dict, main_document, document_summary):
             citation_node = create_citation_node(url, metadata=citation_metadata)
             prev_citation_node = add_citation_node(
                 nodes, citation_node, prev_citation_node
+            )
+            citation_node.relationships[NodeRelationship.PARENT] = RelatedNodeInfo(
+                node_id=parent_node_id
+            )
+            citation_node.relationships[NodeRelationship.SOURCE] = RelatedNodeInfo(
+                node_id=main_document.doc_id
             )
 
         for idx, urls in enumerate(links["archived_links"]):
@@ -174,16 +203,26 @@ def process_references(reference_dict, main_document, document_summary):
                 prev_citation_node = add_citation_node(
                     nodes, citation_node, prev_citation_node
                 )
+                citation_node.relationships[NodeRelationship.PARENT] = RelatedNodeInfo(
+                    node_id=parent_node_id
+                )
+                citation_node.relationships[NodeRelationship.SOURCE] = RelatedNodeInfo(
+                    node_id=main_document.doc_id
+                )
     logging.info("References processed successfully")
     return nodes
 
 
 # create wiki link nodes
-def process_wiki_links(wiki_links_dict, main_document, document_summary):
+def process_wiki_links(
+    wiki_links_dict, main_document, document_summary, section_node_map
+):
     logging.info(f"Processing wiki links for main document: {main_document.doc_id}")
     nodes = []
+
     prev_reference_node = None
     for section, links in wiki_links_dict.items():
+        parent_node_id = section_node_map.get(section)
         for link in links:
             reference_metadata = {
                 "title": f"{sanitise_filename(link[0])}",
@@ -195,6 +234,12 @@ def process_wiki_links(wiki_links_dict, main_document, document_summary):
             reference_node = create_reference_node(link[1], metadata=reference_metadata)
             prev_reference_node = add_reference_node(
                 nodes, reference_node, prev_reference_node
+            )
+            reference_node.relationships[NodeRelationship.PARENT] = RelatedNodeInfo(
+                node_id=parent_node_id
+            )
+            reference_node.relationships[NodeRelationship.SOURCE] = RelatedNodeInfo(
+                node_id=main_document.doc_id
             )
     logging.info("Wiki links processed successfully")
     return nodes
@@ -258,14 +303,16 @@ def process_page_into_doc_and_nodes(page_title):
         )
 
     # Process sections, images, tables, references, and wiki links
-    section_nodes = process_sections(sections, main_document, document_summary, page)
+    section_nodes, section_node_map = process_sections(
+        sections, main_document, document_summary, page
+    )
     image_nodes = process_images(images, main_document, document_summary)
     table_nodes = process_tables(tables, main_document, document_summary)
     reference_nodes = process_references(
-        reference_dict, main_document, document_summary
+        reference_dict, main_document, document_summary, section_node_map
     )
     wiki_link_nodes = process_wiki_links(
-        wiki_links_dict, main_document, document_summary
+        wiki_links_dict, main_document, document_summary, section_node_map
     )
 
     all_nodes = (
@@ -282,7 +329,7 @@ def process_page_into_doc_and_nodes(page_title):
 
 
 # bit to test out the node creation
-# documents = process_page_into_doc_and_nodes("Napoleon")
+# documents = process_page_into_doc_and_nodes("Python (programming language)")
 
 
 def check_nodes(documents, type):

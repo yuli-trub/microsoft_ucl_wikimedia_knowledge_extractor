@@ -30,8 +30,6 @@ class Neo4jClient:
     # create a Document node
     def create_document_node(self, node: Document):
         node_data = node_to_metadata_dict(node)
-        # logging.info(f"Creating Document Node with data: {node_data['metadata']}")
-
         with self.driver.session() as session:
             neo_node_id = session.execute_write(self._create_document_node, node_data)
         logging.info(f"Document node created with neo4j ID: {neo_node_id}")
@@ -55,8 +53,6 @@ class Neo4jClient:
     def create_text_node(self, node: TextNode):
         node_data = node_to_metadata_dict(node)
         label = node_data["type"].capitalize()
-        logging.info(f"label: {label}")
-        # logging.info(f"Creating Text Node with data: {node_data}")
         with self.driver.session() as session:
             neo_node_id = session.execute_write(
                 self._create_text_node, node_data, label
@@ -109,9 +105,9 @@ class Neo4jClient:
     def create_relationship(
         self, from_node_id: str, to_node_id: str, relationship_type: str
     ):
-        logging.info(
-            f"Creating query with these params {relationship_type} from {from_node_id} to {to_node_id}"
-        )
+        # logging.info(
+        #     f"Creating query with these params {relationship_type} from {from_node_id} to {to_node_id}"
+        # )
         try:
             with self.driver.session() as session:
                 relationship = session.write_transaction(
@@ -186,10 +182,27 @@ class Neo4jClient:
         result = tx.run(query, node_id=node_id).single()
         return result["n"] if result else None
 
+    def get_parent_node(self, node_id: str):
+        with self.driver.session() as session:
+            record = session.execute_read(self._get_parent_node, node_id)
+            if record is None:
+                logging.warning(f"Parent node for Llama ID {node_id} not found.")
+                return None
+            return record
+
+    @staticmethod
+    def _get_parent_node(tx, node_id):
+        query = """
+        MATCH (n {llama_node_id: $node_id})-[:PARENT]->(parent)
+        WHERE parent.type IN ['section', 'subsection']
+        RETURN parent
+        """
+        result = tx.run(query, node_id=node_id).single()
+        return result["parent"] if result else None
+
 
 # serialise node object
 def node_to_metadata_dict(node: BaseNode) -> dict:
-
     relationships = (
         {key: {"node_id": value.node_id} for key, value in node.relationships.items()}
         if node.relationships

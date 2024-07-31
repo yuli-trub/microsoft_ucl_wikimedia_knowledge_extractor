@@ -2,7 +2,9 @@ from qdrant_client import QdrantClient
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.core import StorageContext
 from qdrant_client.http.models import VectorParams, Distance
+from qdrant_client.http import models
 import logging
+from llama_index.core.schema import Node
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +51,21 @@ def setup_qdrant_client(host, port, collection_name):
         raise
 
     return client, vector_store, storage_context
+
+
+def add_node_to_qdrant(vector_store, node, neo_node_id, llama_node_id):
+    if node.embedding is not None:
+        qdrant_node = Node(
+            id=llama_node_id,
+            embedding=node.embedding,
+            metadata={"neo4j_node_id": neo_node_id, "llama_node_id": llama_node_id},
+        )
+        vector_store.add([qdrant_node])
+        logging.info(f"Node with llama_node_id {llama_node_id} added to Qdrant.")
+    else:
+        logging.info(
+            f"Node with llama_node_id {llama_node_id} has no embedding and was not added to Qdrant."
+        )
 
 
 def verify_qdrant(client, collection_name):

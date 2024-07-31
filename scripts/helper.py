@@ -19,6 +19,7 @@ def load_env(*keys):
         "EMBEDDING_API_VERSION": os.getenv("EMBEDDING_API_VERSION"),
         "QDRANT_PORT": os.getenv("QDRANT_PORT"),
         "QDRANT_HOST": os.getenv("QDRANT_HOST"),
+        "QDRANT_COLLECTION_NAME": os.getenv("QDRANT_COLLECTION_NAME"),
         "NEO4J_URI": os.getenv("NEO4J_URI"),
         "NEO4J_USER": os.getenv("NEO4J_USER"),
         "NEO4J_PASSWORD": os.getenv("NEO4J_PASSWORD"),

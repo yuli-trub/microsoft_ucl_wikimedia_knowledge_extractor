@@ -220,6 +220,7 @@ def process_image(image_url, headers, min_size):
                 png_data = cairosvg.svg2png(bytestring=preprocessed_svg.encode("utf-8"))
                 logging.info(f"Converted SVG to PNG: {image_name_without_ext}")
                 return {
+                    # "raw_image_data": png_data,
                     "image_data": base64.b64encode(png_data).decode("utf-8"),
                     "image_name": image_name_without_ext,
                 }

@@ -9,6 +9,8 @@ from scripts.wiki_crawler.navigifier import (
     sanitise_filename,
 )
 
+from llama_ingestionator.image_classifier import classify_and_update_image_type
+
 # from transformator import general_summarisor, get_summary
 from scripts.wiki_crawler.data_fetcher import fetch_wiki_data
 from llama_ingestionator.node_creator import (
@@ -108,9 +110,15 @@ def process_images(images, main_document, document_summary):
     nodes = []
     prev_image_node = None
     for image in images:
+        logging.info(f"Processing image - classifying: {image['image_name']}")
+        image_type = classify_and_update_image_type(image["image_data"])
+        if "image" in image_type:
+            image_type = "image"
+        logging.info(f"Image type: {image_type}")
+
         image_metadata = {
             "title": image["image_name"],
-            "type": "image",
+            "type": image_type,
             "source": main_document.doc_id,
             "context": document_summary,
         }

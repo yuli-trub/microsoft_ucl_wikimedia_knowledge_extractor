@@ -5,19 +5,34 @@ import requests
 import base64
 from PIL import Image
 import io
+import logging
+from helper import load_env
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential_jitter,
+    retry_if_exception_type,
+    before_sleep_log,
+)
+import time
 
 
 load_dotenv()
-AZURE_OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OPENAI_ENDPOINT = os.getenv("OPENAI_ENDPOINT")
-GPT4o_DEPLOYMENT_NAME = os.getenv("GPT4O_DEPLOYMENT_ID")
-api_version = "2024-02-01"
-GPT4V_ENDPOINT = f"{OPENAI_ENDPOINT}/openai/deployments/{GPT4o_DEPLOYMENT_NAME}/chat/completions?api-version=2024-02-15-preview"
+
+# get env variables
+env_vars = load_env(
+    "AZURE_OPENAI_API_KEY",
+    "OPENAI_ENDPOINT",
+    "GPT4O_DEPLOYMENT_ID",
+    "GPT4O_API_VERSION",
+)
+
+GPT4_ENDPOINT = f'{env_vars["OPENAI_ENDPOINT"]}/openai/deployments/{env_vars["GPT4O_DEPLOYMENT_ID"]}/chat/completions?api-version={env_vars["GPT4O_API_VERSION"]}'
 
 
 headers = {
     "Content-Type": "application/json",
-    "api-key": AZURE_OPENAI_API_KEY,
+    "api-key": env_vars["AZURE_OPENAI_API_KEY"],
 }
 
 # Payload test for the request from the playground
@@ -77,7 +92,7 @@ def classify_image_from_file(image_path):
                 "content": [
                     {
                         "type": "text",
-                        "text": "Please classify the following image as either a plot (including plots, graphs, diagrams) or an actual image and output the classification class only",
+                        "text": "Please classify the following image as either a plot (including plots, graphs, diagrams) or an actual image and output the classification class only, in one word format: plot or image",
                     },
                     {
                         "type": "image_url",
@@ -91,11 +106,9 @@ def classify_image_from_file(image_path):
         "max_tokens": 800,
     }
 
-    GPT4V_ENDPOINT = f"{OPENAI_ENDPOINT}/openai/deployments/{GPT4o_DEPLOYMENT_NAME}/chat/completions?api-version=2024-02-15-preview"
-
     # Send request to api
     try:
-        response = requests.post(GPT4V_ENDPOINT, headers=headers, json=payload)
+        response = requests.post(GPT4_ENDPOINT, headers=headers, json=payload)
         response.raise_for_status()
     except requests.RequestException as e:
         raise SystemExit(f"Failed to make the request. Error: {e}")
@@ -106,8 +119,91 @@ def classify_image_from_file(image_path):
     return response_json
 
 
-image_path = "../data/image.png"
-response = classify_image_from_file(image_path)
+def resize_image_if_large(base64_image, max_size=(1024, 1024)):
+    """
+    Resize the image if it's larger than the max size while keeping it as PNG.
+
+    :param base64_image: Original image data in base64 format.
+    :param max_size: Maximum width and height of the resized image.
+    :return: Resized image data in base64 format.
+    """
+    try:
+        image_data = base64.b64decode(base64_image)
+
+        with Image.open(io.BytesIO(image_data)) as img:
+            if img.size[0] * img.size[1] > max_size[0] * max_size[1]:
+                img.thumbnail(max_size, Image.LANCZOS)
+
+                # Save the resized image to a bytes buffer
+                buffer = io.BytesIO()
+                img.save(buffer, format="PNG", optimize=True)
+
+                resized_image_data = buffer.getvalue()
+                return base64.b64encode(resized_image_data).decode("utf-8")
+
+        return base64_image
+
+    except Exception as e:
+        logging.error(f"Error resizing image: {e}")
+        return base64_image
+
+
+@retry(
+    wait=wait_exponential_jitter(initial=1, max=60),
+    stop=stop_after_attempt(10),
+    retry=retry_if_exception_type(requests.exceptions.RequestException),
+    before_sleep=before_sleep_log(logging, logging.WARNING),
+)
+def classify_image_from_memory(image_data):
+
+    payload = {
+        "messages": [
+            {
+                "role": "system",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "You are an AI assistant that helps people classify images.",
+                    }
+                ],
+            },
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Please classify the following image as either a plot (including plots, graphs, diagrams) or an actual image and output the classification class only.",
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{image_data}"},
+                    },
+                ],
+            },
+        ],
+        "temperature": 0.7,
+        "top_p": 0.95,
+        "max_tokens": 800,
+    }
+    response = None
+    try:
+        response = requests.post(GPT4_ENDPOINT, headers=headers, json=payload)
+        logging.info(f"Image classification response: {response.json()}")
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        if response is not None:
+            if response.status_code == 429:
+                logging.warning("Rate limit exceeded. Retrying...")
+                time.sleep(10)
+            elif response.status_code == 400 and "image is too large" in response.text:
+                logging.warning("Image is too large. Resizing and retrying...")
+                resized_image = resize_image_if_large(image_data)
+                return classify_image_from_memory(resized_image)
+
+        logging.error(f"Failed to classify the image. Error: {e}")
+        raise
+
+    return response.json()
 
 
 # Extract and print classification result
@@ -118,5 +214,8 @@ def get_classification(response):
         return "Classification failed or unclear"
 
 
-classification = get_classification(response)
-print(f"Classification result: {classification}")
+def classify_and_update_image_type(image_data):
+    response = classify_image_from_memory(image_data)
+    logging.info(f"Image classification response: {response}")
+    classification = get_classification(response)
+    return classification.lower() if classification else "unknown"

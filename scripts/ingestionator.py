@@ -54,20 +54,20 @@ env_vars = load_env(
 GPT4_ENDPOINT = f'{env_vars["OPENAI_ENDPOINT"]}/openai/deployments/{env_vars["GPT4O_DEPLOYMENT_ID"]}/chat/completions?api-version={env_vars["GPT4O_API_VERSION"]}'
 
 # # Neo4j and Qdrant configurations
-# neo4j_config = {
-#     "uri": env_vars["NEO4J_URI"],
-#     "user": env_vars["NEO4J_USER"],
-#     "password": env_vars["NEO4J_PASSWORD"],
-# }
+neo4j_config = {
+    "uri": env_vars["NEO4J_URI"],
+    "user": env_vars["NEO4J_USER"],
+    "password": env_vars["NEO4J_PASSWORD"],
+}
 
-# qdrant_config = {
-#     "host": env_vars["QDRANT_HOST"],
-#     "port": env_vars["QDRANT_PORT"],
-#     "collection_name": env_vars["QDRANT_COLLECTION_NAME"],
-# }
+qdrant_config = {
+    "host": env_vars["QDRANT_HOST"],
+    "port": env_vars["QDRANT_PORT"],
+    "collection_name": env_vars["QDRANT_COLLECTION_NAME"],
+}
 
 # # Initialize StorageManager
-# storage_manager = StorageManager(neo4j_config, qdrant_config)
+storage_manager = StorageManager(neo4j_config, qdrant_config)
 
 # set up embedding model
 embed_model = AzureOpenAIEmbedding(
@@ -89,29 +89,30 @@ llm = AzureOpenAI(
 Settings.llm = llm
 
 # get pre saved initial Nodes
-filename = "climate_change_image_test.pkl"
+filename = "squirrel_image_test.pkl"
 
 if os.path.exists(filename):
     documents = load_documents_from_file(filename)
     print(f"Loaded {len(documents)} documents from {filename}")
 else:
-    documents = process_page_into_doc_and_nodes("Climate Change")
+    documents = process_page_into_doc_and_nodes("Squirrel")
     save_documents_to_file(documents, filename)
     print(f"Processed and saved {len(documents)} documents")
 
-# # initialise the pipeline
-# pipeline = create_pipeline(storage_manager.vector_store)
+# initialise the pipeline
+pipeline = create_pipeline(storage_manager.vector_store)
 
-# # get pre saved transformed Nodes
-# test_filename = "climate-pipeline-nodes.pkl"
+# get pre saved transformed Nodes
+test_filename = "squirrel-test.pkl"
 
-# if os.path.exists(test_filename):
-#     test_nodes = load_documents_from_file(test_filename)
-#     print(f"Loaded {len(test_nodes)} documents from {test_filename}")
-# else:
-#     test_nodes = run_pipeline(documents, pipeline, embed_model)
-#     save_documents_to_file(test_nodes, test_filename)
-#     print(f"Processed and saved {len(test_nodes)} documents")
+if os.path.exists(test_filename):
+    test_nodes = load_documents_from_file(test_filename)
+    print(f"Loaded {len(test_nodes)} documents from {test_filename}")
+else:
+    logging.info(f"Processing {len(documents)} documents")
+    test_nodes = run_pipeline(documents, pipeline, embed_model)
+    save_documents_to_file(test_nodes, test_filename)
+    print(f"Processed and saved {len(test_nodes)} documents")
 
 # Add nodes to neo4j
 # id_map = storage_manager.store_nodes_and_relationships(test_nodes)

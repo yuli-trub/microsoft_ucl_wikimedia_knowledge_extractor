@@ -17,6 +17,9 @@ from tenacity import (
 )
 import time
 from helper import load_env, log_duration
+import base64
+from PIL import Image
+import io
 
 # TODO change the source from metadata to relationship dict
 
@@ -71,7 +74,7 @@ class EmbeddingTransformation(TransformComponent):
                     embedding = text_embed_model.get_text_embedding(doc.text)
                     doc.embedding = embedding
                     logging.info(
-                        f"Generated embedding for TextNode ID {doc.metadata['title']}: {doc.embedding[:5]}..."
+                        f"Generated embedding for TextNode ID {doc.metadata['title']} {doc.metadata['type']}: {doc.embedding[:5]}..."
                     )
                 # elif isinstance(doc, ImageNode):
                 #     embedding = image_embed_model.get_image_embedding(doc.image_path)
@@ -86,8 +89,18 @@ class TextCleaner(TransformComponent):
     def __call__(self, nodes, **kwargs):
         logging.info(f"Processing {len(nodes)} nodes")
         for node in nodes:
-            if node.metadata.get("type") in ["section", "subsection"]:
-                logging.info(f"Processing node ID: {node.node_id}")
+            if isinstance(node, TextNode) and node.metadata.get("type") not in [
+                "page",
+                "table",
+                "citation",
+                "archive-citation",
+                "wiki-ref",
+                "image",
+                "plot",
+            ]:
+                logging.info(
+                    f"Processing node ID: {node.metadata['title']} of type {node.metadata['type']}"
+                )
                 logging.info(f"Original text: {node.text[:150]}...")
                 node.text = re.sub(r"[^0-9A-Za-z ]", "", node.text)
                 logging.info(f"Cleaned text: {node.text[:150]}...")
@@ -96,16 +109,31 @@ class TextCleaner(TransformComponent):
 
 
 class OpenAIBaseTransformation(TransformComponent):
+    @log_duration
     @retry(
         wait=wait_exponential_jitter(initial=1, max=60),
         stop=stop_after_attempt(10),
         retry=retry_if_exception_type(requests.exceptions.RequestException),
     )
-    def openai_request(self, prompt, text, function=None):
+    def openai_request(self, prompt, image=None, text=None, function=None):
+
+        user_content = [{"type": "text", "text": prompt}]
+
+        if text:
+            user_content.append({"type": "text", "text": text})
+
+        if image:
+            user_content.append(
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/png;base64,{image}"},
+                }
+            )
+
         payload = {
             "messages": [
                 {"role": "system", "content": "You are an AI assistant."},
-                {"role": "user", "content": f"{prompt} {text}"},
+                {"role": "user", "content": user_content},
             ],
             "temperature": 0.7,
             "top_p": 0.95,
@@ -121,9 +149,14 @@ class OpenAIBaseTransformation(TransformComponent):
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
+            if response:
+                logging.error(
+                    f"Request failed with error: {e}. Response content: {response.content}"
+                )
             if response and response.status_code == 429:
                 logging.warning("Rate limit exceeded. Retrying...")
                 time.sleep(10)
+
             raise
 
     def get_response(self, response):
@@ -134,7 +167,7 @@ class OpenAIBaseTransformation(TransformComponent):
             logging.info(f"Estimated cost: ${cost:.2f}")
             return response["choices"][0]["message"]["content"]
         except (KeyError, IndexError):
-            logging.error("Failed to retrieve summary from response.")
+            logging.error(f"Failed to retrieve response.")
             return "Transformation failed or unclear"
 
     def calculate_cost(self, tokens):
@@ -173,6 +206,10 @@ class SemanticChunkingTransformation(TransformComponent):
                     "entities",
                     "summary",
                     "key_takeaways",
+                    "image_description",
+                    "plot_insights",
+                    "image_entities",
+                    "chunk",
                 ]:
                     node.metadata["needs_embedding"] = False
                 transformed_nodes.append(node)
@@ -260,7 +297,7 @@ class EntityExtractorTransformation(OpenAIBaseTransformation):
         for idx, node in enumerate(documents):
             logging.info(f"Extracting entities from node ID: {node.node_id}")
             if node.metadata.get("type") in ["section", "subsection"]:
-                response = self.openai_request(prompt, node.text)
+                response = self.openai_request(prompt, text=node.text)
 
                 if response:
                     entities_json = self.get_response(response)
@@ -298,7 +335,7 @@ class SummaryTransformation(OpenAIBaseTransformation):
                     "as output give a string of a brief summary (6 sentences) of the text."
                 )
 
-                response = self.openai_request(prompt, node.text)
+                response = self.openai_request(prompt, text=node.text)
                 summary = self.get_response(response)
                 summary_node = TextNode(
                     text=summary,
@@ -330,7 +367,7 @@ class KeyTakeawaysTransformation(OpenAIBaseTransformation):
                     "as output give a string of a list of key takeaways from the text."
                 )
 
-                response = self.openai_request(prompt, node.text)
+                response = self.openai_request(prompt, text=node.text)
                 takeways = self.get_response(response)
                 takeaways_node = TextNode(
                     text=takeways,
@@ -346,4 +383,144 @@ class KeyTakeawaysTransformation(OpenAIBaseTransformation):
                     node_id=node.node_id
                 )
                 new_nodes.append(takeaways_node)
+        return documents + new_nodes
+
+
+def resize_image(image_base64, max_size=(1024, 1024)):
+    image_data = base64.b64decode(image_base64)
+    image = Image.open(io.BytesIO(image_data))
+    image.thumbnail(max_size, Image.LANCZOS)
+
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    return base64.b64encode(buffer.getvalue()).decode()
+
+
+class ImageDescriptionTransformation(OpenAIBaseTransformation):
+    def __call__(self, documents, **kwargs):
+        new_nodes = []
+
+        for idx, node in enumerate(documents):
+            if isinstance(node, ImageNode):
+                logging.info(
+                    f"Creating description for image: {node.metadata['title']}"
+                )
+                context = node.metadata.get("context")
+
+                if node.metadata.get("type") == "image":
+                    prompt = f"""Considering the context for the image: {context}.
+                                 Please describe the image in detail, covering the main elements visible in the picture. 
+                                 Mention the setting, any people or objects of interest, and their interactions or relationships. 
+                                 Highlight any emotions or atmospheres conveyed by the image, and speculate on the context or story behind what is depicted. 
+                                 If certain aspects are unclear, provide a brief description of the elements that are clear and meaningful. 
+                                 If you cannot provide a complete answer, specify which aspects are unclear or missing, and then state "error: unable to provide an answer
+                                 Avoid stating "error: unable to provide answer" unless absolutely no analysis can be provided.
+"""
+                elif node.metadata.get("type") == "plot":
+                    prompt = f"""Considering the context for the image: {context}. 
+                                 Provide a detailed analysis of the image, identifying and describing any data, labels, or key elements visible.
+                                 Explain the relationships, trends, or patterns depicted.
+                                 If some parts are unclear, summarize the insights that are clear and significant.
+                                 If you cannot provide a complete answer, specify which aspects are unclear or missing, and then state "error: unable to provide an answer
+                                 Avoid stating "error: unable to provide answer" unless absolutely no analysis can be provided.    """
+
+                resised_image = resize_image(node.image)
+                response = self.openai_request(prompt, image=resised_image)
+                description = self.get_response(response)
+                logging.info(f"Pic Description: {description}")
+
+                if "error: unable" not in description:
+                    description_node = TextNode(
+                        text=description,
+                        metadata={
+                            "title": f"{node.metadata['title']}_image_description",
+                            "type": "image_description",
+                            "source": node.metadata["source"],
+                            "needs_embedding": True,
+                            "context": context,
+                        },
+                    )
+                    description_node.relationships[NodeRelationship.PARENT] = (
+                        RelatedNodeInfo(node_id=node.node_id)
+                    )
+                    new_nodes.append(description_node)
+        return documents + new_nodes
+
+
+class PlotInsightsTransformation(OpenAIBaseTransformation):
+    def __call__(self, documents, **kwargs):
+        new_nodes = []
+
+        for idx, node in enumerate(documents):
+            if isinstance(node, ImageNode) and node.metadata.get("type") == "plot":
+                logging.info(f"Extracting insights for plot: {node.metadata['title']}")
+                context = node.metadata.get("context")
+
+                prompt = f"""
+                Considering the context for the image: {context}. 
+                Please analyse the diagram and summarise the key insights. 
+                Identify the most significant data points and trends shown in the image. 
+                If any information is unclear or missing, provide a brief explanation of the insights that are clear.
+                In case you cannot provide a comprehensive answer, do not make things up. 
+                If you cannot provide a complete answer, specify which aspects are unclear or missing, and then state "error: unable to provide an answer
+                Avoid stating "error: unable to provide answer" unless absolutely no analysis can be provided."""
+
+                resised_image = resize_image(node.image)
+                response = self.openai_request(prompt, image=resised_image)
+                insights = self.get_response(response)
+                logging.info(f"Plot Insights: {insights}")
+
+                if "error: unable" not in insights:
+                    insights_node = TextNode(
+                        text=insights,
+                        metadata={
+                            "title": f"{node.metadata['title']}_plot_insights",
+                            "type": "plot_insights",
+                            "source": node.metadata["source"],
+                            "needs_embedding": True,
+                            "context": context,
+                        },
+                    )
+                    insights_node.relationships[NodeRelationship.PARENT] = (
+                        RelatedNodeInfo(node_id=node.node_id)
+                    )
+                    new_nodes.append(insights_node)
+        return documents + new_nodes
+
+
+class ImageEntitiesTransformation(OpenAIBaseTransformation):
+    def __call__(self, documents, **kwargs):
+        new_nodes = []
+
+        for idx, node in enumerate(documents):
+            if isinstance(node, ImageNode) and node.metadata.get("type") == "image":
+                logging.info(f"Extracting insights for image: {node.metadata['title']}")
+                context = node.metadata.get("context")
+
+                prompt = f"""Given the image, analyze and list all important entities present.
+                    Describe each entity in detail, focusing on their characteristics and significance within the provided context: {context}.
+                    If certain entities or details are unclear, provide as much accurate information as you can about the elements that are clear and meaningful.
+                    Avoid stating "error: unable to provide answer" unless absolutely no analysis can be provided. 
+                    Ensure your response is clear and concise, highlighting any insights or observations, even if they are partial."""
+
+                resised_image = resize_image(node.image)
+                response = self.openai_request(prompt, image=resised_image)
+                entities = self.get_response(response)
+                logging.info(f"Image Entities: {entities}")
+
+                if "error: unable" not in entities:
+                    entities_node = TextNode(
+                        text=entities,
+                        metadata={
+                            "title": f"{node.metadata['title']}_image_entities",
+                            "type": "image_entities",
+                            "source": node.metadata["source"],
+                            "needs_embedding": True,
+                            "context": context,
+                        },
+                    )
+                    entities_node.relationships[NodeRelationship.PARENT] = (
+                        RelatedNodeInfo(node_id=node.node_id)
+                    )
+                    new_nodes.append(entities_node)
         return documents + new_nodes

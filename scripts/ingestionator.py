@@ -115,22 +115,22 @@ else:
     print(f"Processed and saved {len(test_nodes)} documents")
 
 # Add nodes to neo4j
-# id_map = storage_manager.store_nodes_and_relationships(test_nodes)
-# logging.info(f"Node ID Map: {id_map}")
+id_map = storage_manager.store_nodes_and_relationships(test_nodes)
+logging.info(f"Node ID Map: {id_map}")
 
-# # Add nodes with embeddings to Qdrant
-# storage_manager.add_nodes_to_qdrant(test_nodes, id_map)
+# Add nodes with embeddings to Qdrant
+storage_manager.add_nodes_to_qdrant(test_nodes, id_map)
 
-# # build index
-# index = storage_manager.build_index()
+# build index
+index = storage_manager.build_index()
 
 # Initialize vector store and index
-# client, vector_store, storage_context = setup_qdrant_client(**qdrant_config)
-# index = VectorStoreIndex.from_vector_store(vector_store, embed_model=embed_model)
+client, vector_store, storage_context = setup_qdrant_client(**qdrant_config)
+index = VectorStoreIndex.from_vector_store(vector_store, embed_model=embed_model)
 
 
-# # retrieval stage
-# retriever = Retriever(storage_manager, embed_model)
+# retrieval stage
+retriever = Retriever(storage_manager, embed_model)
 
 # Example question
 question = "What is human input to Climate Change?"

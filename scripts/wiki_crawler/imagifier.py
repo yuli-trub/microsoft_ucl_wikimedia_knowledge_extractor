@@ -223,6 +223,7 @@ def process_image(image_url, headers, min_size):
                     # "raw_image_data": png_data,
                     "image_data": base64.b64encode(png_data).decode("utf-8"),
                     "image_name": image_name_without_ext,
+                    "image_url": image_url,
                 }
             except Exception as e:
                 logging.error(
@@ -242,12 +243,14 @@ def process_image(image_url, headers, min_size):
                     return {
                         "image_data": base64.b64encode(png_data).decode("utf-8"),
                         "image_name": image_name_without_ext,
+                        "image_url": image_url,
                     }
                 else:
                     logging.info(f"Saved PNG image: {image_name_without_ext}")
                     return {
                         "image_data": base64.b64encode(image_data).decode("utf-8"),
                         "image_name": image_name_without_ext,
+                        "image_url": image_url,
                     }
             except UnidentifiedImageError:
                 logging.error(f"Unable to identify image at URL: {image_url}")

@@ -24,13 +24,18 @@ class StorageManager:
                 logging.info(f"Creating document node {node.doc_id}")
                 neo_node_id = neo4j_client.create_document_node(node)
                 node_id_map[node.doc_id] = neo_node_id
-            elif isinstance(node, TextNode) and not isinstance(node, Document):
-                logging.info(f"Creating text node {node.node_id}")
-                neo_node_id = neo4j_client.create_text_node(node)
-                node_id_map[node.node_id] = neo_node_id
             elif isinstance(node, ImageNode):
-                logging.info(f"Creating image node {node.node_id}")
+                logging.info(f"image node info: {node.metadata['url']}")
+                logging.info(
+                    f"Creating image node {node.metadata['title']} of type {node.metadata['type']}"
+                )
                 neo_node_id = neo4j_client.create_image_node(node)
+                node_id_map[node.node_id] = neo_node_id
+            elif isinstance(node, TextNode) and not isinstance(node, Document):
+                logging.info(
+                    f"Creating text node {node.metadata['title']} of type {node.metadata['type']}"
+                )
+                neo_node_id = neo4j_client.create_text_node(node)
                 node_id_map[node.node_id] = neo_node_id
 
         logging.info(f"Nodes created in Neo4j {node_id_map}")

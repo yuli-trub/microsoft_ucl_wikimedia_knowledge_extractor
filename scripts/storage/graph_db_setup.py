@@ -78,26 +78,33 @@ class Neo4jClient:
         return result.single()["neo_node_id"]
 
     # create an ImageNode
-    def create_image_node(self, node: ImageNode):
+    def create_image_node(
+        self,
+        node: ImageNode,
+    ):
         node_data = node_to_metadata_dict(node)
+        label = node_data["type"].capitalize()
+        image_url = node.metadata["url"]
         with self.driver.session() as session:
-            neo_node_id = session.execute_write(self._create_image_node, node_data)
+            neo_node_id = session.execute_write(
+                self._create_image_node, node_data, label, image_url
+            )
         logging.info(f"ImageNode created with neo4j ID: {neo_node_id}")
         return neo_node_id
 
     @staticmethod
-    def _create_image_node(tx, node_data):
-        query = """
-        CREATE (n:ImageNode {
-            node_id: $node_id, 
-            image_path: $image_path, 
+    def _create_image_node(tx, node_data, label, image_url):
+        query = f"""
+        CREATE (n:{label} {{
+            llama_node_id: $llama_node_id, 
+            image_url: "{image_url}", 
             metadata: $metadata, 
             title: $title,
             type: $type,
             relationships: $relationships, 
             embedding: $embedding
-        })
-        RETURN elementId(n) AS neo_node_id
+        }})
+        RETURN elementId(n) AS neo_node_id, n.llama_node_id AS llama_node_id
         """
         result = tx.run(query, **node_data)
         return result.single()["neo_node_id"]

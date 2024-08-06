@@ -121,6 +121,7 @@ def process_images(images, main_document, document_summary):
             "type": image_type,
             "source": main_document.doc_id,
             "context": document_summary,
+            "url": image["image_url"],
         }
         image_node = create_image_node(
             image_data=image["image_data"], metadata=image_metadata

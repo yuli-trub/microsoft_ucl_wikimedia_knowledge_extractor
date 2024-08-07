@@ -63,7 +63,7 @@ neo4j_config = {
 qdrant_config = {
     "host": env_vars["QDRANT_HOST"],
     "port": env_vars["QDRANT_PORT"],
-    "collection_name": env_vars["QDRANT_COLLECTION_NAME"],
+    "collection_name": "squirrel",
 }
 
 # # Initialize StorageManager
@@ -100,10 +100,10 @@ else:
     print(f"Processed and saved {len(documents)} documents")
 
 # initialise the pipeline
-pipeline = create_pipeline(storage_manager.vector_store)
+pipeline = create_pipeline()
 
 # get pre saved transformed Nodes
-test_filename = "squirrel-test.pkl"
+test_filename = "squirrel-pipeline-image_embed_test.pkl"
 
 if os.path.exists(test_filename):
     test_nodes = load_documents_from_file(test_filename)
@@ -125,12 +125,18 @@ else:
 index = storage_manager.build_index()
 
 # Initialize vector store and index
-client, vector_store, storage_context = setup_qdrant_client(**qdrant_config)
-index = VectorStoreIndex.from_vector_store(vector_store, embed_model=embed_model)
+(
+    client,
+    text_vector_store,
+    image_vector_store,
+    text_storage_context,
+    image_storage_context,
+) = setup_qdrant_client(**qdrant_config)
+index = VectorStoreIndex.from_vector_store(text_vector_store, embed_model=embed_model)
 
 
 # retrieval stage
-retriever = Retriever(storage_manager, embed_model)
+# retriever = Retriever(storage_manager, embed_model)
 
 # Example question
 question = "What is the main characteristics of squirrel?"
@@ -140,24 +146,24 @@ question = "What is the main characteristics of squirrel?"
 # logging.info(f"Retrieved nodes: {neo_nodes}")
 
 
-parent_nodes = retriever.retrieve(question, top_k=10)
-logging.info(f"Retrieved parent nodes: {parent_nodes}")
+# parent_nodes = retriever.retrieve(question, top_k=10)
+# logging.info(f"Retrieved parent nodes: {parent_nodes}")
 
 
 from llama_index.core.schema import ImageNode
 
 # # get text from parent nodes or images
-images = [node.metadata["url"] for node in parent_nodes if isinstance(node, ImageNode)]
-texts = [node.text for node in parent_nodes if hasattr(node, "text")]
-combined_text = " ".join(texts)
-combined_images = " ".join(images)
-logging.info(f"Texts from parent nodes: {texts}")
-logging.info(f"Images from parent nodes: {images}")
+# images = [node.metadata["url"] for node in parent_nodes if isinstance(node, ImageNode)]
+# texts = [node.text for node in parent_nodes if hasattr(node, "text")]
+# combined_text = " ".join(texts)
+# combined_images = " ".join(images)
+# logging.info(f"Texts from parent nodes: {texts}")
+# logging.info(f"Images from parent nodes: {images}")
 
 
 # # llm input
-llm_rag_input = f"Context: {combined_text}\n\nImages retrieved: {combined_images}\n\nQuestion: {question}\n\nAnswer:"
-llm_input = f"Question: {question}\n\nAnswer:"
+# llm_rag_input = f"Context: {combined_text}\n\nImages retrieved: {combined_images}\n\nQuestion: {question}\n\nAnswer:"
+# llm_input = f"Question: {question}\n\nAnswer:"
 
 
 # llm_rag_input = (
@@ -186,26 +192,26 @@ llm_input = f"Question: {question}\n\nAnswer:"
 # )
 # qa_tmpl = PromptTemplate(qa_tmpl_str)
 
-query_engine = index.as_query_engine(multi_modal_llm=llm)
+# query_engine = index.as_query_engine(multi_modal_llm=llm)
 
-from llama_index.core.query_engine import FLAREInstructQueryEngine
+# from llama_index.core.query_engine import FLAREInstructQueryEngine
 
-flare_query_engine = FLAREInstructQueryEngine(
-    query_engine=query_engine,
-    max_iterations=7,
-    verbose=True,
-)
+# flare_query_engine = FLAREInstructQueryEngine(
+#     query_engine=query_engine,
+#     max_iterations=7,
+#     verbose=True,
+# )
 
-# prompts_dict = query_engine.get_prompts()
-# logging.info(prompts_dict)
+# # prompts_dict = query_engine.get_prompts()
+# # logging.info(prompts_dict)
 
-# # Query with context
+# # # Query with context
 
-standard_response = llm.complete(llm_input)
-enhanced_response = flare_query_engine.query(llm_rag_input)
+# standard_response = llm.complete(llm_input)
+# enhanced_response = flare_query_engine.query(llm_rag_input)
 
 # Log and print both responses for comparison
-logging.info(f"Enhanced Response: {enhanced_response}")
-logging.info(f"Standard Response: {standard_response}")
+# logging.info(f"Enhanced Response: {enhanced_response}")
+# logging.info(f"Standard Response: {standard_response}")
 
 storage_manager.close()

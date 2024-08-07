@@ -31,6 +31,8 @@ env_vars = load_env(
     "GPT4_ENDPOINT",
     "EMBEDDING_DEPLOYMENT_ID",
     "EMBEDDING_API_VERSION",
+    "COMPUTER_VISION_ENDPOINT",
+    "COMPUTER_VISION_API_KEY",
 )
 
 AZURE_OPENAI_API_KEY = env_vars["AZURE_OPENAI_API_KEY"]
@@ -67,20 +69,62 @@ Settings.text_splitter = SemanticSplitterNodeParser(
 
 class EmbeddingTransformation(TransformComponent):
     # @log_duration
+
     def __call__(self, documents, text_embed_model, **kwargs):
         for doc in documents:
             if doc.metadata.get("needs_embedding"):
-                if isinstance(doc, TextNode):
+                if isinstance(doc, ImageNode):
+                    embedding = self.get_image_embedding(doc.metadata["url"])
+                    logging.info(
+                        f"Generated embedding for ImageNode ID {doc.metadata['title']}:..."
+                    )
+                    doc.embedding = embedding
+                elif isinstance(doc, TextNode):
                     embedding = text_embed_model.get_text_embedding(doc.text)
                     doc.embedding = embedding
+                    # logging.info(
+                    #     f"Generated embedding for TextNode ID {doc.metadata['title']} {doc.metadata['type']}: {doc.embedding[:5]}..."
+                    # )
                     logging.info(
-                        f"Generated embedding for TextNode ID {doc.metadata['title']} {doc.metadata['type']}: {doc.embedding[:5]}..."
+                        f"Generated embedding for TextNode ID {doc.metadata['title']}"
                     )
-                # elif isinstance(doc, ImageNode):
-                #     embedding = image_embed_model.get_image_embedding(doc.image_path)
-                #     logging.info(f"Generated embedding for ImageNode ID {doc.metadata['id']}: {embedding[:5]}...")
-                #     doc.embedding = embedding
         return documents
+
+    @retry(
+        wait=wait_exponential_jitter(initial=1, max=60),
+        stop=stop_after_attempt(10),
+        retry=retry_if_exception_type(requests.exceptions.RequestException),
+    )
+    def get_image_embedding(self, image_url):
+        endpoint = f"{env_vars['COMPUTER_VISION_ENDPOINT']}computervision/"
+        headers = {
+            "Content-Type": "application/json",
+            "Ocp-Apim-Subscription-Key": env_vars["COMPUTER_VISION_API_KEY"],
+        }
+
+        data = {"url": image_url}
+        version = "?api-version=2024-02-01&model-version=2023-04-15"
+        vectorize_img_url = endpoint + "retrieval:vectorizeImage" + version
+
+        logging.info(f"Request URL: {vectorize_img_url}")
+        logging.info(f"Headers: {headers}")
+        logging.info(f"Data being sent: {data}")
+
+        try:
+            response = requests.post(vectorize_img_url, headers=headers, json=data)
+            response.raise_for_status()
+            json_data = response.json()
+            logging.info(f"Image embedding response: {json_data}")
+            return json_data.get("vector")
+        except requests.exceptions.RequestException as e:
+            if response:
+                logging.error(
+                    f"Request failed with error: {e}. Response content: {response.content}"
+                )
+            if response and response.status_code == 429:
+                logging.warning("Rate limit exceeded. Retrying...")
+                time.sleep(10)
+            raise
 
 
 # text cleaner from llamaindex
@@ -210,8 +254,15 @@ class SemanticChunkingTransformation(TransformComponent):
                     "plot_insights",
                     "image_entities",
                     "chunk",
+                    "image",
+                    "plot",
                 ]:
                     node.metadata["needs_embedding"] = False
+                elif node.metadata.get("type") in [
+                    "image",
+                    "plot",
+                ]:
+                    node.metadata["needs_embedding"] = True
                 transformed_nodes.append(node)
 
         return transformed_nodes

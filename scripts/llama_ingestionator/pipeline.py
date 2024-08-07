@@ -19,7 +19,7 @@ from llama_index.core import Settings
 # TODO: add image processing later
 
 
-def create_pipeline(vector_store):
+def create_pipeline():
 
     # initialise the transformations
     text_cleaner = TextCleaner()
@@ -38,11 +38,11 @@ def create_pipeline(vector_store):
             # entities_extractor,
             # summarisor,
             # key_takeaways,
-            image_description,
-            plot_insights,
-            image_entities,
+            # image_description,
+            # plot_insights,
+            # image_entities,
             semantic_chunking,
-            text_cleaner,
+            # text_cleaner,
             embedding,
         ],
     )

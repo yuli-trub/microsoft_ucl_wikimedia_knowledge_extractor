@@ -9,9 +9,13 @@ from llama_index.core import VectorStoreIndex
 class StorageManager:
     def __init__(self, neo4j_config, qdrant_config):
         self.neo4j_client = Neo4jClient(**neo4j_config)
-        self.qdrant_client, self.vector_store, self.storage_context = (
-            setup_qdrant_client(**qdrant_config)
-        )
+        (
+            self.qdrant_client,
+            self.text_vector_store,
+            self.image_vector_store,
+            self.text_storage_context,
+            self.image_storage_context,
+        ) = setup_qdrant_client(**qdrant_config)
 
     def store_nodes_and_relationships(self, nodes):
         neo4j_client = self.neo4j_client
@@ -68,12 +72,12 @@ class StorageManager:
                 neo_node_id = id_map.get(node.node_id)
                 if neo_node_id:
                     add_node_to_qdrant(
-                        self.vector_store, node, neo_node_id, node.node_id
+                        self.text_vector_store, node, neo_node_id, node.node_id
                     )
 
     def build_index(self):
         logging.info("Building VectorStoreIndex from Qdrant vector store.")
-        index = VectorStoreIndex.from_vector_store(self.vector_store)
+        index = VectorStoreIndex.from_vector_store(self.text_vector_store)
         logging.info("Index built successfully.")
         return index
 
@@ -84,7 +88,7 @@ class StorageManager:
             else None
         )
         return self.qdrant_client.search(
-            collection_name=self.vector_store.collection_name,
+            collection_name=self.text_vector_store.collection_name,
             query_vector=query_vector,
             with_payload=True,
             limit=top_k,

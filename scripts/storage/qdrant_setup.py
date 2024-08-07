@@ -21,36 +21,66 @@ def setup_qdrant_client(host, port, collection_name):
         logger.error(f"Error connecting to Qdrant client: {e}")
         raise
 
-    try:
-        collection_exists = False
+    def check_collection_exists(collection_name, vector_size):
         try:
-            client.get_collection(collection_name=collection_name)
-            collection_exists = True
-            logger.info(f"Collection '{collection_name}' already exists.")
-        except Exception as e:
-            logger.info(
-                f"Collection '{collection_name}' does not exist. Creating new collection."
-            )
+            collection_exists = False
+            try:
+                client.get_collection(collection_name=collection_name)
+                collection_exists = True
+                logger.info(f"Collection '{collection_name}' already exists.")
+            except Exception:
+                logger.info(
+                    f"Collection '{collection_name}' does not exist. Creating new collection."
+                )
 
-        if not collection_exists:
-            client.create_collection(
-                collection_name=collection_name,
-                vectors_config=VectorParams(size=1536, distance=Distance.COSINE),
+            if not collection_exists:
+                client.create_collection(
+                    collection_name=collection_name,
+                    vectors_config=VectorParams(
+                        size=vector_size, distance=Distance.COSINE
+                    ),
+                )
+                logger.info(f"Collection '{collection_name}' created successfully.")
+        except Exception as e:
+            logger.error(
+                f"Error checking or creating collection '{collection_name}': {e}"
             )
-            logger.info(f"Collection '{collection_name}' created successfully.")
-    except Exception as e:
-        logger.error(f"Error checking or creating collection: {e}")
-        raise
+            raise
+
+    text_collection_name = collection_name + "_text"
+    image_collection_name = collection_name + "_image"
+    check_collection_exists(text_collection_name, vector_size=1536)
+
+    check_collection_exists(image_collection_name, vector_size=1024)
 
     try:
-        vector_store = QdrantVectorStore(client=client, collection_name=collection_name)
-        storage_context = StorageContext.from_defaults(vector_store=vector_store)
-        logger.info("Connected to Qdrant vector store successfully.")
+        text_vector_store = QdrantVectorStore(
+            client=client, collection_name=text_collection_name
+        )
+        image_vector_store = QdrantVectorStore(
+            client=client, collection_name=image_collection_name
+        )
+        text_storage_context = StorageContext.from_defaults(
+            vector_store=text_vector_store
+        )
+        image_storage_context = StorageContext.from_defaults(
+            vector_store=image_vector_store
+        )
+        logger.info("Connected to Qdrant vector stores successfully.")
+        # vector_store = QdrantVectorStore(client=client, collection_name=collection_name)
+        # storage_context = StorageContext.from_defaults(vector_store=vector_store)
+        # logger.info("Connected to Qdrant vector store successfully.")
     except Exception as e:
         logger.error(f"Error connecting to Qdrant vector store: {e}")
         raise
 
-    return client, vector_store, storage_context
+    return (
+        client,
+        text_vector_store,
+        image_vector_store,
+        text_storage_context,
+        image_storage_context,
+    )
 
 
 def add_node_to_qdrant(vector_store, node, neo_node_id, llama_node_id):

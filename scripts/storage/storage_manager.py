@@ -77,12 +77,18 @@ class StorageManager:
         logging.info("Index built successfully.")
         return index
 
-    def vector_search(self, query_vector, top_k):
+    def vector_search(self, query_vector, top_k, node_type):
+        filter_condition = (
+            {"must": [{"key": "type", "match": {"value": node_type}}]}
+            if node_type
+            else None
+        )
         return self.qdrant_client.search(
             collection_name=self.vector_store.collection_name,
             query_vector=query_vector,
             with_payload=True,
             limit=top_k,
+            query_filter=filter_condition,
         )
 
     def close(self):

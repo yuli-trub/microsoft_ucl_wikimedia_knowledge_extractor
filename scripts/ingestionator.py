@@ -115,11 +115,11 @@ else:
     print(f"Processed and saved {len(test_nodes)} documents")
 
 # Add nodes to neo4j
-id_map = storage_manager.store_nodes_and_relationships(test_nodes)
-logging.info(f"Node ID Map: {id_map}")
+# id_map = storage_manager.store_nodes_and_relationships(test_nodes)
+# logging.info(f"Node ID Map: {id_map}")
 
-# Add nodes with embeddings to Qdrant
-storage_manager.add_nodes_to_qdrant(test_nodes, id_map)
+# # Add nodes with embeddings to Qdrant
+# storage_manager.add_nodes_to_qdrant(test_nodes, id_map)
 
 # build index
 index = storage_manager.build_index()
@@ -133,26 +133,31 @@ index = VectorStoreIndex.from_vector_store(vector_store, embed_model=embed_model
 retriever = Retriever(storage_manager, embed_model)
 
 # Example question
-question = "What is human input to Climate Change?"
+question = "What is the main characteristics of squirrel?"
 
 # this doesn't work idk why yet - says missing positional argument
 # neo_nodes = retriever.retrieve_nodes_from_neo4j(llama_ids)
 # logging.info(f"Retrieved nodes: {neo_nodes}")
 
 
-# parent_nodes = retriever.retrieve(question, top_k=10)
-# logging.info(f"Retrieved nodes and parent nodes: {parent_nodes}")
+parent_nodes = retriever.retrieve(question, top_k=10)
+logging.info(f"Retrieved parent nodes: {parent_nodes}")
 
 
-# # get text from parent nodes
-# texts = [node.text for node in parent_nodes if hasattr(node, "text")]
-# combined_text = " ".join(texts)
-# logging.info(f"Texts from parent nodes: {texts}")
+from llama_index.core.schema import ImageNode
+
+# # get text from parent nodes or images
+images = [node.metadata["url"] for node in parent_nodes if isinstance(node, ImageNode)]
+texts = [node.text for node in parent_nodes if hasattr(node, "text")]
+combined_text = " ".join(texts)
+combined_images = " ".join(images)
+logging.info(f"Texts from parent nodes: {texts}")
+logging.info(f"Images from parent nodes: {images}")
 
 
 # # llm input
-# # llm_rag_input = f"Context: {combined_text}\n\nQuestion: {question}\n\nAnswer:"
-# # llm_input = f"Question: {question}\n\nAnswer:"
+llm_rag_input = f"Context: {combined_text}\n\nImages retrieved: {combined_images}\n\nQuestion: {question}\n\nAnswer:"
+llm_input = f"Question: {question}\n\nAnswer:"
 
 
 # llm_rag_input = (
@@ -181,26 +186,26 @@ question = "What is human input to Climate Change?"
 # )
 # qa_tmpl = PromptTemplate(qa_tmpl_str)
 
-# query_engine = index.as_query_engine(multi_modal_llm=llm, text_qa_template=qa_tmpl)
+query_engine = index.as_query_engine(multi_modal_llm=llm)
 
-# from llama_index.core.query_engine import FLAREInstructQueryEngine
+from llama_index.core.query_engine import FLAREInstructQueryEngine
 
-# flare_query_engine = FLAREInstructQueryEngine(
-#     query_engine=query_engine,
-#     max_iterations=7,
-#     verbose=True,
-# )
+flare_query_engine = FLAREInstructQueryEngine(
+    query_engine=query_engine,
+    max_iterations=7,
+    verbose=True,
+)
 
 # prompts_dict = query_engine.get_prompts()
 # logging.info(prompts_dict)
 
 # # Query with context
 
-# standard_response = llm.complete(llm_input)
-# enhanced_response = flare_query_engine.query(llm_rag_input)
+standard_response = llm.complete(llm_input)
+enhanced_response = flare_query_engine.query(llm_rag_input)
 
-# # Log and print both responses for comparison
-# logging.info(f"Enhanced Response: {enhanced_response}")
-# logging.info(f"Standard Response: {standard_response}")
+# Log and print both responses for comparison
+logging.info(f"Enhanced Response: {enhanced_response}")
+logging.info(f"Standard Response: {standard_response}")
 
-# storage_manager.close()
+storage_manager.close()

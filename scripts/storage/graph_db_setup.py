@@ -192,18 +192,21 @@ class Neo4jClient:
 
     def get_parent_node(self, node_id: str):
         with self.driver.session() as session:
+            logging.info(f"Retrieving parent node for Llama ID: {node_id}")
             record = session.execute_read(self._get_parent_node, node_id)
             if record is None:
                 logging.warning(f"Parent node for Llama ID {node_id} not found.")
                 return None
+
             parent_node = metadata_dict_to_node(record)
+            logging.info(f"Parent node retrieved : {parent_node}")
             return parent_node
 
     @staticmethod
     def _get_parent_node(tx, node_id):
         query = """
         MATCH (parent)-[:PARENT]->(n {llama_node_id: $node_id})
-        WHERE parent.type IN ['section', 'subsection']
+        WHERE parent.type IN ['section', 'subsection', 'image', 'plot']
         RETURN parent
         """
         result = tx.run(query, node_id=node_id).single()
@@ -267,10 +270,10 @@ def metadata_dict_to_node(meta: dict) -> BaseNode:
             # relationships=relationships,
             embedding=embedding,
         )
-    if "image_path" in meta:
+    if "image_url" in meta:
         return ImageNode(
             node_id=meta["llama_node_id"],
-            image_path=meta["image_path"],
+            image_url=meta["image_url"],
             metadata=json.loads(meta["metadata"]),
             # relationships=relationships,
             embedding=embedding,

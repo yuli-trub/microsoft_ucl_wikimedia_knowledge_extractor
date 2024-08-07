@@ -55,10 +55,23 @@ def setup_qdrant_client(host, port, collection_name):
 
 def add_node_to_qdrant(vector_store, node, neo_node_id, llama_node_id):
     if node.embedding is not None:
+        if node.metadata.get("type") in [
+            "image_description",
+            "plot_insights",
+            "image_entities",
+        ]:
+            node_type = "image"
+        else:
+            node_type = "text"
+
         qdrant_node = Node(
             id=llama_node_id,
             embedding=node.embedding,
-            metadata={"neo4j_node_id": neo_node_id, "llama_node_id": llama_node_id},
+            metadata={
+                "neo4j_node_id": neo_node_id,
+                "llama_node_id": llama_node_id,
+                "type": node_type,
+            },
         )
         vector_store.add([qdrant_node])
         logging.info(f"Node with llama_node_id {llama_node_id} added to Qdrant.")

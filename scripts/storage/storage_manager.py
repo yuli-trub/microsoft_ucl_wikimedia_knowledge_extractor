@@ -11,6 +11,7 @@ class StorageManager:
         self.neo4j_client = Neo4jClient(**neo4j_config)
         (
             self.qdrant_client,
+            self.qdrant_aclient,
             self.text_vector_store,
             self.image_vector_store,
             self.text_storage_context,
@@ -71,9 +72,14 @@ class StorageManager:
             if node.embedding is not None:
                 neo_node_id = id_map.get(node.node_id)
                 if neo_node_id:
-                    add_node_to_qdrant(
-                        self.text_vector_store, node, neo_node_id, node.node_id
-                    )
+                    if isinstance(node, ImageNode):
+                        add_node_to_qdrant(
+                            self.image_vector_store, node, neo_node_id, node.node_id
+                        )
+                    else:
+                        add_node_to_qdrant(
+                            self.text_vector_store, node, neo_node_id, node.node_id
+                        )
 
     def build_index(self):
         logging.info("Building VectorStoreIndex from Qdrant vector store.")
@@ -81,7 +87,8 @@ class StorageManager:
         logging.info("Index built successfully.")
         return index
 
-    def vector_search(self, query_vector, top_k, node_type):
+    def vector_search(self, query_vector, top_k, node_type=None):
+
         filter_condition = (
             {"must": [{"key": "type", "match": {"value": node_type}}]}
             if node_type

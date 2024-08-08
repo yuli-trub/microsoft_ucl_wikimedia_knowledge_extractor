@@ -22,7 +22,7 @@ from storage.storage_manager import StorageManager
 from storage.qdrant_setup import setup_qdrant_client
 
 # import retriever
-from retriever.retrievifier import Retriever
+from retriever.retrievifier import GraphVectorRetriever
 
 
 # TODO: fix the links with new API call
@@ -121,49 +121,72 @@ else:
 # # Add nodes with embeddings to Qdrant
 # storage_manager.add_nodes_to_qdrant(test_nodes, id_map)
 
-# build index
-index = storage_manager.build_index()
 
 # Initialize vector store and index
 (
     client,
+    aclient,
     text_vector_store,
     image_vector_store,
     text_storage_context,
     image_storage_context,
 ) = setup_qdrant_client(**qdrant_config)
+
 index = VectorStoreIndex.from_vector_store(text_vector_store, embed_model=embed_model)
 
 
+# fusion retriever
+from llama_index.core.retrievers import QueryFusionRetriever
+
+# fusion_retriever = QueryFusionRetriever(
+#     [text_index.as_retriever()],
+#     similarity_top_k=10,
+#     num_queries=4,
+#     use_async=False,
+#     verbose=True,
+# )
+
 # retrieval stage
-# retriever = Retriever(storage_manager, embed_model)
+retriever = GraphVectorRetriever(storage_manager, embed_model)
+
 
 # Example question
+
 question = "What is the main characteristics of squirrel?"
 
-# this doesn't work idk why yet - says missing positional argument
-# neo_nodes = retriever.retrieve_nodes_from_neo4j(llama_ids)
-# logging.info(f"Retrieved nodes: {neo_nodes}")
+# search_results = fusion_retriever._run_sync_queries(question)
+# logging.info(f"Search results: {len(search_results)}")
 
 
-# parent_nodes = retriever.retrieve(question, top_k=10)
-# logging.info(f"Retrieved parent nodes: {parent_nodes}")
+parent_nodes = retriever.fusion_retrieve(question)
+logging.info(
+    f"Retrieved parent nodes: { [ node.metadata['type'] for node in parent_nodes ] }"
+)
 
 
 from llama_index.core.schema import ImageNode
 
 # # get text from parent nodes or images
-# images = [node.metadata["url"] for node in parent_nodes if isinstance(node, ImageNode)]
-# texts = [node.text for node in parent_nodes if hasattr(node, "text")]
-# combined_text = " ".join(texts)
-# combined_images = " ".join(images)
-# logging.info(f"Texts from parent nodes: {texts}")
-# logging.info(f"Images from parent nodes: {images}")
+images = [node.metadata["url"] for node in parent_nodes if isinstance(node, ImageNode)]
+texts = [node.text for node in parent_nodes if hasattr(node, "text")]
+combined_text = " ".join(texts)
+combined_images = " ".join(images)
+logging.info(f"Texts from parent nodes: {texts}")
+logging.info(f"Images from parent nodes: {images}")
 
 
 # # llm input
-# llm_rag_input = f"Context: {combined_text}\n\nImages retrieved: {combined_images}\n\nQuestion: {question}\n\nAnswer:"
-# llm_input = f"Question: {question}\n\nAnswer:"
+llm_rag_input = (
+    "The following context information has been retrieved:\n\n"
+    "Context:\n"
+    f"{combined_text}\n"
+    "\nImages:\n"
+    f"{combined_images}\n"
+    "\nBased on this information, please answer the following question in a detailed and informative manner:\n"
+    f"Question: {question}\n"
+    "Answer:"
+)
+llm_input = f"Question: {question}\n\nAnswer:"
 
 
 # llm_rag_input = (
@@ -192,26 +215,26 @@ from llama_index.core.schema import ImageNode
 # )
 # qa_tmpl = PromptTemplate(qa_tmpl_str)
 
-# query_engine = index.as_query_engine(multi_modal_llm=llm)
+query_engine = index.as_query_engine(multi_modal_llm=llm)
 
-# from llama_index.core.query_engine import FLAREInstructQueryEngine
+from llama_index.core.query_engine import FLAREInstructQueryEngine
 
-# flare_query_engine = FLAREInstructQueryEngine(
-#     query_engine=query_engine,
-#     max_iterations=7,
-#     verbose=True,
-# )
+flare_query_engine = FLAREInstructQueryEngine(
+    query_engine=query_engine,
+    max_iterations=7,
+    verbose=True,
+)
 
 # # prompts_dict = query_engine.get_prompts()
 # # logging.info(prompts_dict)
 
 # # # Query with context
 
-# standard_response = llm.complete(llm_input)
-# enhanced_response = flare_query_engine.query(llm_rag_input)
+standard_response = llm.complete(llm_input)
+enhanced_response = flare_query_engine.query(llm_rag_input)
 
 # Log and print both responses for comparison
-# logging.info(f"Enhanced Response: {enhanced_response}")
-# logging.info(f"Standard Response: {standard_response}")
+logging.info(f"Enhanced Response: {enhanced_response}")
+logging.info(f"Standard Response: {standard_response}")
 
 storage_manager.close()

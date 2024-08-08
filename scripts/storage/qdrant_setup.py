@@ -2,7 +2,7 @@ from qdrant_client import QdrantClient
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 from llama_index.core import StorageContext
 from qdrant_client.http.models import VectorParams, Distance
-from qdrant_client.http import models
+from qdrant_client import AsyncQdrantClient
 import logging
 from llama_index.core.schema import Node
 
@@ -13,6 +13,10 @@ def setup_qdrant_client(host, port, collection_name):
 
     try:
         client = QdrantClient(
+            host=host,
+            port=port,
+        )
+        aclient = AsyncQdrantClient(
             host=host,
             port=port,
         )
@@ -76,6 +80,7 @@ def setup_qdrant_client(host, port, collection_name):
 
     return (
         client,
+        aclient,
         text_vector_store,
         image_vector_store,
         text_storage_context,
@@ -89,6 +94,8 @@ def add_node_to_qdrant(vector_store, node, neo_node_id, llama_node_id):
             "image_description",
             "plot_insights",
             "image_entities",
+            "plot",
+            "image",
         ]:
             node_type = "image"
         else:

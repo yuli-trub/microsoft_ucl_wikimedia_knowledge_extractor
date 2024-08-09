@@ -177,12 +177,18 @@ logging.info(f"Images from parent nodes: {images}")
 
 # # llm input
 llm_rag_input = (
-    "The following context information has been retrieved:\n\n"
-    "Context:\n"
+    "You are provided with context information retrieved from various sources. "
+    "Please use this information to answer the following question thoroughly and concisely.\n\n"
+    "Context (Textual Information):\n"
     f"{combined_text}\n"
-    "\nImages:\n"
+    "\nRelevant Images (if applicable):\n"
     f"{combined_images}\n"
-    "\nBased on this information, please answer the following question in a detailed and informative manner:\n"
+    "\nInstructions:\n"
+    "- Base your answer primarily on the textual context provided.\n"
+    "- Use relevant details from the images only if they add value to the answer.\n"
+    "- Structure your response using headings and bullet points for clarity.\n"
+    "- Avoid repeating information.\n"
+    "- Ensure the answer is informative and directly addresses the question.\n\n"
     f"Question: {question}\n"
     "Answer:"
 )

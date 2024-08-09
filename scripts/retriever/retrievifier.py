@@ -57,7 +57,7 @@ class GraphVectorRetriever:
         for node_id in llama_node_ids:
             parent_node = self.storage_manager.neo4j_client.get_parent_node(node_id)
             # logging.info(f"Parent node in Neo4j: {parent_node}")
-            if parent_node:
+            if parent_node and parent_node not in parent_nodes:
                 parent_nodes.append(parent_node)
         # logging.info(f"Found parent node in Neo4j: {len(parent_nodes)}")
         return parent_nodes
@@ -93,7 +93,8 @@ class GraphVectorRetriever:
         queries = response.text.strip().split("\n")
         for query in queries:
             logging.info(f"Generated query: {query}")
-        return queries
+        # return the list including the original query as well
+        return [query_str] + queries
 
     #    run them
     def run_queries(
@@ -108,7 +109,7 @@ class GraphVectorRetriever:
 
         return results_dict
 
-    # rerank results
+    # rerank results and boost text results
     def fuse_results(
         self, results_dict: Dict[str, List[NodeWithScore]], similarity_top_k: int = 10
     ) -> List[NodeWithScore]:
@@ -123,8 +124,6 @@ class GraphVectorRetriever:
             ):
                 node_content = json.loads(scored_point.payload["_node_content"])
                 point_id = node_content.get("id_", None)
-                logging.info(f"Node content: {node_content}")
-                logging.info(f"Extracted text: {point_id}")
 
                 text_to_node[point_id] = scored_point
                 if point_id not in fused_scores:
@@ -158,9 +157,10 @@ class GraphVectorRetriever:
         parent_nodes = self.find_parent_nodes(llama_node_ids)
         return parent_nodes
 
+    @log_duration
     def fusion_retrieve(self, query, top_k=10):
+        # generate extra queries
         queries = self.generate_queries(query)
-        logging.info(f"Generated queries: {queries}")
 
         # vector search for each query
         results_dict = self.run_queries(queries, top_k)

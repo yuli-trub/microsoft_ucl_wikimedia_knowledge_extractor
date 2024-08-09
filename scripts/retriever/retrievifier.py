@@ -8,6 +8,7 @@ from llama_index.core.schema import NodeWithScore
 from tqdm import tqdm
 from llama_index.core import Settings
 import json
+from llama_index.core.schema import ImageNode
 
 
 class GraphVectorRetriever:
@@ -174,3 +175,14 @@ class GraphVectorRetriever:
         parent_nodes = self.find_parent_nodes(llama_node_ids)
 
         return parent_nodes
+
+    def get_context_from_retrived_nodes(self, parent_nodes):
+        images = [
+            node.metadata["url"] for node in parent_nodes if isinstance(node, ImageNode)
+        ]
+        texts = [node.text for node in parent_nodes if hasattr(node, "text")]
+        combined_text = " ".join(texts)
+        combined_images = " ".join(images)
+        logging.info(f"Texts from parent nodes: {texts}")
+        logging.info(f"Images from parent nodes: {images}")
+        return combined_text, combined_images

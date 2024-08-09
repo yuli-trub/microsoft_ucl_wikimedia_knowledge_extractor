@@ -2,8 +2,8 @@ from llama_index.core.schema import Document, ImageNode, TextNode
 import logging
 from storage.graph_db_setup import Neo4jClient
 from storage.qdrant_setup import setup_qdrant_client, add_node_to_qdrant
-from qdrant_client.http.models import models, SearchRequest, SearchParams, VectorStruct
 from llama_index.core import VectorStoreIndex
+from llama_index.core import Settings
 
 
 class StorageManager:
@@ -11,12 +11,12 @@ class StorageManager:
         self.neo4j_client = Neo4jClient(**neo4j_config)
         (
             self.qdrant_client,
-            self.qdrant_aclient,
             self.text_vector_store,
             self.image_vector_store,
             self.text_storage_context,
             self.image_storage_context,
         ) = setup_qdrant_client(**qdrant_config)
+        self.embed_model = Settings.embed_model
 
     def store_nodes_and_relationships(self, nodes):
         neo4j_client = self.neo4j_client
@@ -83,7 +83,9 @@ class StorageManager:
 
     def build_index(self):
         logging.info("Building VectorStoreIndex from Qdrant vector store.")
-        index = VectorStoreIndex.from_vector_store(self.text_vector_store)
+        index = VectorStoreIndex.from_vector_store(
+            self.text_vector_store, embed_model=self.embed_model
+        )
         logging.info("Index built successfully.")
         return index
 
@@ -101,6 +103,14 @@ class StorageManager:
             limit=top_k,
             query_filter=filter_condition,
         )
+
+    def store_nodes(self, nodes):
+        # Add nodes to neo4j
+        id_map = self.store_nodes_and_relationships(nodes)
+        logging.info(f"Node ID Map: {id_map}")
+
+        # Add nodes with embeddings to Qdrant
+        self.add_nodes_to_qdrant(nodes, id_map)
 
     def close(self):
         self.neo4j_client.close()

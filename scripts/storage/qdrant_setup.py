@@ -16,10 +16,7 @@ def setup_qdrant_client(host, port, collection_name):
             host=host,
             port=port,
         )
-        aclient = AsyncQdrantClient(
-            host=host,
-            port=port,
-        )
+
         logger.info("Connected to Qdrant client successfully.")
     except Exception as e:
         logger.error(f"Error connecting to Qdrant client: {e}")
@@ -80,7 +77,6 @@ def setup_qdrant_client(host, port, collection_name):
 
     return (
         client,
-        aclient,
         text_vector_store,
         image_vector_store,
         text_storage_context,

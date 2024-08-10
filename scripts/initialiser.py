@@ -2,7 +2,7 @@
 from llama_index.embeddings.azure_openai import AzureOpenAIEmbedding
 from llama_index.llms.azure_openai import AzureOpenAI
 from llama_index.core import Settings
-from storage.storage_manager import StorageManager
+from scripts.storage.storage_manager import StorageManager
 
 
 def initialise_embed_model(env_vars):

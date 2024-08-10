@@ -1,7 +1,7 @@
 from llama_index.core.schema import Document, ImageNode, TextNode
 import logging
-from storage.graph_db_setup import Neo4jClient
-from storage.qdrant_setup import setup_qdrant_client, add_node_to_qdrant
+from scripts.storage.graph_db_setup import Neo4jClient
+from scripts.storage.qdrant_setup import setup_qdrant_client, add_node_to_qdrant
 from llama_index.core import VectorStoreIndex
 from llama_index.core import Settings
 

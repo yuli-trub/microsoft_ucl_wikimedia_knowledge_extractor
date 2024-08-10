@@ -13,7 +13,7 @@ from openai import AzureOpenAI
 from dotenv import load_dotenv
 import logging
 import gc
-from helper import log_duration
+from scripts.helper import log_duration
 
 load_dotenv()
 USER_AGENT = os.getenv("USER_AGENT")

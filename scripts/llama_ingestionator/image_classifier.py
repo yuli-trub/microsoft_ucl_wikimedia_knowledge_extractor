@@ -6,7 +6,7 @@ import base64
 from PIL import Image
 import io
 import logging
-from helper import load_env
+from scripts.helper import load_env
 from tenacity import (
     retry,
     stop_after_attempt,

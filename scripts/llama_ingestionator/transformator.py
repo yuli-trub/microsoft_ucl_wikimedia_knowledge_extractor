@@ -16,7 +16,7 @@ from tenacity import (
     retry_if_exception_type,
 )
 import time
-from helper import load_env, log_duration
+from scripts.helper import load_env, log_duration
 import base64
 from PIL import Image
 import io

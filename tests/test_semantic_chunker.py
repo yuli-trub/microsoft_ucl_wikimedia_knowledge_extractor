@@ -1,6 +1,6 @@
 import unittest
 from llama_index.embeddings.openai import OpenAIEmbedding
-from scripts.transformator import SemanticChunker
+from llama_ingestionator.transformator import SemanticChunker
 from llama_index.core.schema import TextNode
 
 

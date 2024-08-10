@@ -1,6 +1,6 @@
 # config.py
 import os
-from helper import load_env
+from scripts.helper import load_env
 import logging
 
 

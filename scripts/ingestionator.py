@@ -1,4 +1,4 @@
-from helper import (
+from scripts.helper import (
     load_env,
     save_documents_to_file,
     load_documents_from_file,
@@ -16,10 +16,12 @@ from config import setup_logging, get_neo4j_config, get_qdrant_config
 from llama_ingestionator.pipeline import create_pipeline, run_pipeline
 
 # import storage_manager
-from storage.storage_manager import StorageManager
+from scripts.storage.storage_manager import StorageManager
 
 # import retriever
 from retriever.retrievifier import GraphVectorRetriever
+
+from llama_index.core.query_engine import FLAREInstructQueryEngine
 
 
 # TODO: fix the links with new API call
@@ -133,8 +135,6 @@ llm_rag_input = (
 llm_input = f"Question: {question}\n\nAnswer:"
 
 query_engine = index.as_query_engine(multi_modal_llm=llm)
-
-from llama_index.core.query_engine import FLAREInstructQueryEngine
 
 flare_query_engine = FLAREInstructQueryEngine(
     query_engine=query_engine,

@@ -1,6 +1,6 @@
-from helper import log_duration
+from scripts.helper import log_duration
 from llama_index.core.ingestion import IngestionPipeline, IngestionCache
-from llama_ingestionator.transformator import (
+from scripts.llama_ingestionator.transformator import (
     TextCleaner,
     SemanticChunkingTransformation,
     EntityExtractorTransformation,

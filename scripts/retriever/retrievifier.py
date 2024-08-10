@@ -1,7 +1,7 @@
 import logging
 from typing import List, Dict
-from storage.storage_manager import StorageManager
-from helper import log_duration
+from scripts.storage.storage_manager import StorageManager
+from scripts.helper import log_duration
 from llama_index.core import PromptTemplate
 from typing import List
 from llama_index.core.schema import NodeWithScore

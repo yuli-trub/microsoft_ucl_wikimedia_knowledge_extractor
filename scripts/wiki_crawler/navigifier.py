@@ -173,7 +173,7 @@ def extract_section_titles(page_content):
     return sections
 
 
-# helper fucntion to save to dir
+# scripts.helper fucntion to save to dir
 def sanitise_filename(filename):
     """
     Sanitise a string to be used as a filename

@@ -3,7 +3,7 @@ from llama_index.core.schema import BaseNode, TextNode, ImageNode, Document
 import json
 import numpy as np
 import logging
-from helper import load_env
+from scripts.helper import load_env
 from llama_index.core.schema import RelatedNodeInfo
 
 

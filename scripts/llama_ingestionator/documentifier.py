@@ -9,11 +9,11 @@ from scripts.wiki_crawler.navigifier import (
     sanitise_filename,
 )
 
-from llama_ingestionator.image_classifier import classify_and_update_image_type
+from scripts.llama_ingestionator.image_classifier import classify_and_update_image_type
 
 # from transformator import general_summarisor, get_summary
 from scripts.wiki_crawler.data_fetcher import fetch_wiki_data
-from llama_ingestionator.node_creator import (
+from scripts.llama_ingestionator.node_creator import (
     create_document,
     create_text_node,
     create_image_node,
@@ -28,7 +28,7 @@ from llama_ingestionator.node_creator import (
 )
 from llama_index.core.schema import NodeRelationship, RelatedNodeInfo
 import logging
-from helper import log_duration
+from scripts.helper import log_duration
 
 
 # create main doc

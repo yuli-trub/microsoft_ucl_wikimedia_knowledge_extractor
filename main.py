@@ -73,6 +73,8 @@ def main() -> None:
     setup_logging()
 
     try:
+
+        print("started main")
         # Load environment variables
         env_vars = get_env_vars()
 
@@ -92,14 +94,14 @@ def main() -> None:
         # === KNOWLEDGE EXTRACTOR PART ===
 
         # Load or create initial nodes
-        filename = "squirrel_image_test.pkl"
+        filename = "/data/squirrel_image_test.pkl"
         initial_documents = get_initial_nodes(filename)
 
         # Initialise the pipeline
         pipeline = create_pipeline()
 
         # Load or create transformed nodes
-        test_filename = "squirrel-pipeline-image_embed_test.pkl"
+        test_filename = "/data/squirrel-pipeline-image_embed_test.pkl"
         pipeline_transformed_nodes = create_transformed_nodes(
             initial_documents, test_filename, pipeline, embed_model
         )

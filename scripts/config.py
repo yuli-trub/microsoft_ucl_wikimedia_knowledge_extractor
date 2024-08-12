@@ -24,7 +24,7 @@ def get_env_vars():
 def setup_logging() -> None:
     """Set up logging configuration."""
 
-    log_directory = "/app/logs" 
+    log_directory = os.path.expanduser('~/app_logs') 
     os.makedirs(log_directory, exist_ok=True) 
 
     log_file_path = os.path.join(log_directory, 'app.log')

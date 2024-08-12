@@ -12,10 +12,10 @@ from llama_index.core.schema import RelatedNodeInfo
 # logging = logging.getlogging()
 
 # get env vars
-env_vars = load_env("NEO4J_URI", "NEO4J_USER", "NEO4J_PASSWORD")
-NEO4J_URI = env_vars["NEO4J_URI"]
-NEO4J_USER = env_vars["NEO4J_USER"]
-NEO4J_PASSWORD = env_vars["NEO4J_PASSWORD"]
+env_vars = load_env("DB_NEO4J_URI", "DB_NEO4J_USER", "DB_NEO4J_PASSWORD")
+DB_NEO4J_URI = env_vars["DB_NEO4J_URI"]
+DB_NEO4J_USER = env_vars["DB_NEO4J_USER"]
+DB_NEO4J_PASSWORD = env_vars["DB_NEO4J_PASSWORD"]
 
 
 class Neo4jClient:
@@ -289,4 +289,4 @@ def metadata_dict_to_node(meta: dict) -> BaseNode:
 
 
 # test it out
-# neo4j_client = Neo4jClient(NEO4J_URI, NEO4J_USER, NEO4J_PASSWORD)
+# neo4j_client = Neo4jClient(DB_NEO4J_URI, DB_NEO4J_USER, DB_NEO4J_PASSWORD)

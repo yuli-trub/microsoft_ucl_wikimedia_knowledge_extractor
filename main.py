@@ -106,7 +106,7 @@ def main() -> None:
 
         # Store nodes and relationships in Neo4j
         # uncoment later - already stored
-        # storage_manager.store_nodes(pipeline_transformed_nodes)
+        storage_manager.store_nodes(pipeline_transformed_nodes)
 
         # Build index
         index = storage_manager.build_index()

@@ -1,17 +1,17 @@
 services:
   app:
     build: .
-    env_file: 
+    volumes:
+      - ./app_logs:/app/logs # Mount logs to the host machine
+    env_file:
       - .env
-    ports: 
+    ports:
       - 3000:3000
     depends_on:
       - qdrant
-      - neo4j 
+      - neo4j
     command: sh -c "python main.py"
 
-
-  
   qdrant:
     image: qdrant/qdrant
     ports:
@@ -19,13 +19,16 @@ services:
       - 6334:6334
     volumes:
       - "$PWD/qdrant_storage:/qdrant/storage:z"
-  
+
   neo4j:
     image: neo4j:5.17.0
     ports:
       - 7474:7474
       - 7687:7687
-    env_file: 
+    env_file:
       - .env
     volumes:
-      - "$PWD/neo4j/data:/data"
+      - ./neo4j/data:/data
+      - ./neo4j/logs:/logs
+      - ./neo4j/import:/var/lib/neo4j/import
+    command: [ "neo4j", "start", "--verbose" ]

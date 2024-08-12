@@ -40,9 +40,9 @@ env_vars = load_env(
     "QDRANT_PORT",
     "QDRANT_HOST",
     "QDRANT_COLLECTION_NAME",
-    "NEO4J_URI",
-    "NEO4J_USER",
-    "NEO4J_PASSWORD",
+    "DB_NEO4J_URI",
+    "DB_NEO4J_USER",
+    "DB_NEO4J_PASSWORD",
 )
 
 GPT4_ENDPOINT = f'{env_vars["OPENAI_ENDPOINT"]}/openai/deployments/{env_vars["GPT4O_DEPLOYMENT_ID"]}/chat/completions?api-version={env_vars["GPT4O_API_VERSION"]}'

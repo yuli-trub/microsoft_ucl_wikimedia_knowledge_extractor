@@ -17,14 +17,15 @@ from scripts.helper import log_duration
 
 load_dotenv()
 USER_AGENT = os.getenv("USER_AGENT")
-CONFIG_CAIRO_PATH = os.getenv("CONFIG_CAIRO_PATH")
+# CONFIG_CAIRO_PATH = os.getenv("CONFIG_CAIRO_PATH")
 
 
 try:
-    ctypes.CDLL(CONFIG_CAIRO_PATH)
+    # Attempt to load the Cairo library for Linux
+    # The Cairo library should be installed in the Docker container using a package manager
+    ctypes.CDLL("libcairo.so.2")
 except OSError as e:
-    print(f"Error loading libcairo-2.dll: {e}")
-import cairosvg
+    print(f"Error loading libcairo.so.2: {e}")
 
 
 Image.MAX_IMAGE_PIXELS = None

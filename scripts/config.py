@@ -15,27 +15,36 @@ def get_env_vars():
         "QDRANT_PORT",
         "QDRANT_HOST",
         "QDRANT_COLLECTION_NAME",
-        "NEO4J_URI",
-        "NEO4J_USER",
-        "NEO4J_PASSWORD",
+        "DB_NEO4J_URI",
+        "DB_NEO4J_USER",
+        "DB_NEO4J_PASSWORD",
     )
 
 
 def setup_logging() -> None:
     """Set up logging configuration."""
-    logging.basicConfig(
-        level=logging.INFO,
-        encoding="utf-8",
-        filename="app.log",
-        format="%(asctime)s - %(levelname)s - %(message)s",
-    )
+
+    log_directory = "/app/logs" 
+    os.makedirs(log_directory, exist_ok=True) 
+
+    log_file_path = os.path.join(log_directory, 'app.log')
+
+    log_formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+
+    file_handler = logging.FileHandler(log_file_path, encoding="utf-8")
+    file_handler.setLevel(logging.INFO)
+    file_handler.setFormatter(log_formatter)
+
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    logger.addHandler(file_handler)
 
 
 def get_neo4j_config(env_vars):
     return {
-        "uri": env_vars["NEO4J_URI"],
-        "user": env_vars["NEO4J_USER"],
-        "password": env_vars["NEO4J_PASSWORD"],
+        "uri": env_vars["DB_NEO4J_URI"],
+        "user": env_vars["DB_NEO4J_USER"],
+        "password": env_vars["DB_NEO4J_PASSWORD"],
     }
 
 

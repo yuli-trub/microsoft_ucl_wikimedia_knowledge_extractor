@@ -4,19 +4,35 @@ from scripts.storage.graph_db_setup import Neo4jClient
 from scripts.storage.qdrant_setup import setup_qdrant_client, add_node_to_qdrant
 from llama_index.core import VectorStoreIndex
 from llama_index.core import Settings
+import time
 
 
 class StorageManager:
-    def __init__(self, neo4j_config, qdrant_config):
+    def __init__(self, neo4j_config, qdrant_config, max_retries=10, wait_time=5):
         self.neo4j_client = Neo4jClient(**neo4j_config)
-        (
-            self.qdrant_client,
-            self.text_vector_store,
-            self.image_vector_store,
-            self.text_storage_context,
-            self.image_storage_context,
-        ) = setup_qdrant_client(**qdrant_config)
         self.embed_model = Settings.embed_model
+
+        for attempt in range(max_retries):
+            try:
+                logging.info(f"Attempting to set up Qdrant client (Attempt {attempt + 1}/{max_retries})")
+                
+                (self.qdrant_client,
+                self.text_vector_store,
+                self.image_vector_store,
+                self.text_storage_context,
+                self.image_storage_context,
+                ) = setup_qdrant_client(**qdrant_config)
+                break
+            except Exception as e:
+                logging.error(f"Error setting up Qdrant client: {e}")
+                if attempt < max_retries - 1:
+                    logging.info(f"Retrying in {wait_time} seconds...")
+                    time.sleep(wait_time)
+                else:
+                    logging.error("Max retries reached. Could not set up Qdrant client.")
+                    raise Exception("Failed to set up Qdrant client after several attempts.")
+
+      
 
     def store_nodes_and_relationships(self, nodes):
         neo4j_client = self.neo4j_client

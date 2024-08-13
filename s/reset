@@ -1,1 +1,1 @@
-docker system prune -a -f && docker volume prune -a -f && docker compose up
+docker system prune -a -f && docker volume prune -a -f && sudo docker compose up

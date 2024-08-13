@@ -24,7 +24,7 @@ def get_env_vars():
 def setup_logging() -> None:
     """Set up logging configuration."""
 
-    log_directory = os.path.expanduser('~/app_logs') 
+    log_directory = os.path.expanduser('./app_logs') 
     os.makedirs(log_directory, exist_ok=True) 
 
     log_file_path = os.path.join(log_directory, 'app.log')
@@ -35,9 +35,15 @@ def setup_logging() -> None:
     file_handler.setLevel(logging.INFO)
     file_handler.setFormatter(log_formatter)
 
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(log_formatter)
+
+    # Get the root logger and configure handlers
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
     logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
 
 
 def get_neo4j_config(env_vars):

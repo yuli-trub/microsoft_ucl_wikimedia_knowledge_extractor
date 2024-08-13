@@ -71,23 +71,26 @@ class EmbeddingTransformation(TransformComponent):
     # @log_duration
 
     def __call__(self, documents, text_embed_model, **kwargs):
+        logging.info(f"embed model: {text_embed_model}")
+        logging.info(f"Processing {len(documents)} nodes")
+        text_embed_model = text_embed_model
         for doc in documents:
             if doc.metadata.get("needs_embedding"):
+                logging.info(f"Generating embedding for node ID: {doc.metadata['title']}")
                 if isinstance(doc, ImageNode):
-                    embedding = self.get_image_embedding(doc.metadata["url"])
+                    # embedding = self.get_image_embedding(doc.metadata["url"])
                     logging.info(
-                        f"Generated embedding for ImageNode ID {doc.metadata['title']}:..."
+                        f"could be Generated embedding for ImageNode ID {doc.metadata['title']}:..."
                     )
-                    doc.embedding = embedding
+                    # doc.embedding = embedding
                 elif isinstance(doc, TextNode):
                     embedding = text_embed_model.get_text_embedding(doc.text)
+
                     doc.embedding = embedding
-                    # logging.info(
-                    #     f"Generated embedding for TextNode ID {doc.metadata['title']} {doc.metadata['type']}: {doc.embedding[:5]}..."
-                    # )
                     logging.info(
-                        f"Generated embedding for TextNode ID {doc.metadata['title']}"
+                        f"Generated embedding for TextNode ID {doc.metadata['title']} {doc.metadata['type']}: {doc.embedding[:5]}..."
                     )
+                    
         return documents
 
     @retry(
@@ -221,6 +224,8 @@ class OpenAIBaseTransformation(TransformComponent):
 class SemanticChunkingTransformation(TransformComponent):
     # @log_duration
     def __call__(self, documents, **kwargs):
+        logging.info(f"Chunking: {len(documents)} documents")
+
         transformed_nodes = []
         splitter = Settings.text_splitter
 
@@ -500,10 +505,13 @@ class ImageDescriptionTransformation(OpenAIBaseTransformation):
 
 class PlotInsightsTransformation(OpenAIBaseTransformation):
     def __call__(self, documents, **kwargs):
+        logging.info(f"Processing documents for plot insights. Total documents: {len(documents)}")
         new_nodes = []
+        plots_found = False
 
         for idx, node in enumerate(documents):
             if isinstance(node, ImageNode) and node.metadata.get("type") == "plot":
+                plots_found = True
                 logging.info(f"Extracting insights for plot: {node.metadata['title']}")
                 context = node.metadata.get("context")
 
@@ -536,7 +544,18 @@ class PlotInsightsTransformation(OpenAIBaseTransformation):
                         RelatedNodeInfo(node_id=node.node_id)
                     )
                     new_nodes.append(insights_node)
-        return documents + new_nodes
+            else:
+                continue
+
+        if not plots_found:
+            logging.info("No plots found in the documents. Skipping plot insights extraction.")
+            logging.info(f'random doc {documents[5]}')
+            return documents
+        
+        else:
+            output_docs = documents + new_nodes
+            logging.info(f'plot output docs {(output_docs)}')
+            return output_docs
 
 
 class ImageEntitiesTransformation(OpenAIBaseTransformation):

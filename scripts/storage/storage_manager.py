@@ -67,16 +67,16 @@ class StorageManager:
                 for relationship, related_node_info in node.relationships.items():
 
                     relationship_type = relationship.name
-                    logging.info(
-                        f"Creating relationship {relationship_type} from {node.node_id} to {related_node_info.node_id}"
-                    )
+                    # logging.info(
+                    #     f"Creating relationship {relationship_type} from {node.node_id} to {related_node_info.node_id}"
+                    # )
                     to_id = node.node_id
                     from_id = related_node_info.node_id
                     if to_id:
                         check_relationship = neo4j_client.create_relationship(
                             from_id, to_id, relationship_type
                         )
-                        logging.info(f"Relationship created: {check_relationship}")
+                        # logging.info(f"Relationship created: {check_relationship}")
 
         logging.info("Nodes and relationships created in Neo4j")
 

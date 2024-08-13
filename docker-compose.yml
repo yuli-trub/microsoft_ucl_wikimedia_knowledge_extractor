@@ -2,7 +2,8 @@ services:
   app:
     build: .
     volumes:
-      - ./app_logs:/app/logs # Mount logs to the host machine
+      - ./app_logs:/app/app_logs # Mount logs to the host machine
+      - .:/app # Mount the app code to the container
     env_file:
       - .env
     ports:
@@ -18,7 +19,7 @@ services:
       - 6333:6333
       - 6334:6334
     volumes:
-      - "$PWD/qdrant_storage:/qdrant/storage:z"
+      - "./qdrant_storage:/qdrant/storage"
 
   neo4j:
     image: neo4j:5.17.0

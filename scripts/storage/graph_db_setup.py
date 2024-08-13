@@ -146,7 +146,7 @@ class Neo4jClient:
             to_node_id=to_node_id,
             relationship_type=relationship_type,
         )
-        logging.info(f"Relationship created: {result}")
+        # logging.info(f"Relationship created: {result}")
         return result.single()["r"]
 
     def get_node_by_neo_id(self, node_id: str) -> BaseNode:

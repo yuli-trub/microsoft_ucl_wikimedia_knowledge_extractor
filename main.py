@@ -94,79 +94,79 @@ def main() -> None:
         # === KNOWLEDGE EXTRACTOR PART ===
 
         # Load or create initial nodes
-        filename = "/data/squirrel_image_test.pkl"
+        filename = "./data/squirrel_image_test.pkl"
         initial_documents = get_initial_nodes(filename)
 
         # Initialise the pipeline
         pipeline = create_pipeline()
 
         # Load or create transformed nodes
-        test_filename = "/data/squirrel-pipeline-image_embed_test.pkl"
+        test_filename = "./data/squirrel-pipeline-image_embed_test.pkl"
         pipeline_transformed_nodes = create_transformed_nodes(
             initial_documents, test_filename, pipeline, embed_model
         )
 
         # Store nodes and relationships in Neo4j
         # uncoment later - already stored
-        storage_manager.store_nodes(pipeline_transformed_nodes)
+        # storage_manager.store_nodes(pipeline_transformed_nodes)
 
-        # Build index
-        index = storage_manager.build_index()
+        # # Build index
+        # index = storage_manager.build_index()
 
-        # === RETRIEVAL PART ===
-        # Retrieval stage
-        retriever = GraphVectorRetriever(storage_manager, embed_model)
+        # # === RETRIEVAL PART ===
+        # # Retrieval stage
+        # retriever = GraphVectorRetriever(storage_manager, embed_model)
 
-        # Example question
-        question = (
-            "What is the main characteristics of squirrel and what do they like to eat?"
-        )
+        # # Example question
+        # question = (
+        #     "What is the main characteristics of squirrel and what do they like to eat?"
+        # )
 
-        parent_nodes = retriever.fusion_retrieve(question)
-        logging.info(
-            f"Retrieved parent nodes: {[node.metadata['type'] for node in parent_nodes]}"
-        )
+        # parent_nodes = retriever.fusion_retrieve(question)
+        # logging.info(
+        #     f"Retrieved parent nodes: {[node.metadata['type'] for node in parent_nodes]}"
+        # )
 
-        # Get context from retrieved nodes
-        combined_text, combined_images = retriever.get_context_from_retrived_nodes(
-            parent_nodes
-        )
+        # # Get context from retrieved nodes
+        # combined_text, combined_images = retriever.get_context_from_retrived_nodes(
+        #     parent_nodes
+        # )
 
-        # === FLARE QUERY ENGINE - QUERY PART===
-        # LLM input
-        llm_rag_input = (
-            "You are provided with context information retrieved from various sources. "
-            "Please use this information to answer the following question thoroughly and concisely.\n\n"
-            "Context (Textual Information):\n"
-            f"{combined_text}\n"
-            "\nRelevant Images (URLs) (if applicable):\n"
-            f"{combined_images}\n"
-            "\nInstructions:\n"
-            "- Base your answer primarily on the textual context provided.\n"
-            "- Use relevant details from the images only if they add value to the answer.\n"
-            "- Structure your response using headings and bullet points for clarity.\n"
-            "- Avoid repeating information.\n"
-            "- Ensure the answer is informative and directly addresses the question.\n\n"
-            f"Question: {question}\n"
-            "Answer:"
-        )
-        llm_input = f"Question: {question}\n\nAnswer:"
+        # # === FLARE QUERY ENGINE - QUERY PART===
+        # # LLM input
+        # llm_rag_input = (
+        #     "You are provided with context information retrieved from various sources. "
+        #     "Please use this information to answer the following question thoroughly and concisely.\n\n"
+        #     "Context (Textual Information):\n"
+        #     f"{combined_text}\n"
+        #     "\nRelevant Images (URLs) (if applicable):\n"
+        #     f"{combined_images}\n"
+        #     "\nInstructions:\n"
+        #     "- Base your answer primarily on the textual context provided.\n"
+        #     "- Use relevant details from the images only if they add value to the answer.\n"
+        #     "- Structure your response using headings and bullet points for clarity.\n"
+        #     "- Avoid repeating information.\n"
+        #     "- Ensure the answer is informative and directly addresses the question.\n\n"
+        #     f"Question: {question}\n"
+        #     "Answer:"
+        # )
+        # llm_input = f"Question: {question}\n\nAnswer:"
 
-        query_engine = index.as_query_engine(multi_modal_llm=llm)
+        # query_engine = index.as_query_engine(multi_modal_llm=llm)
 
-        flare_query_engine = FLAREInstructQueryEngine(
-            query_engine=query_engine,
-            max_iterations=7,
-            verbose=True,
-        )
+        # flare_query_engine = FLAREInstructQueryEngine(
+        #     query_engine=query_engine,
+        #     max_iterations=7,
+        #     verbose=True,
+        # )
 
-        # Query with context
-        standard_response = llm.complete(llm_input)
-        enhanced_response = flare_query_engine.query(llm_rag_input)
+        # # Query with context
+        # standard_response = llm.complete(llm_input)
+        # enhanced_response = flare_query_engine.query(llm_rag_input)
 
-        # Log and print both responses for comparison
-        logging.info(f"Enhanced Response: {enhanced_response}")
-        logging.info(f"Standard Response: {standard_response}")
+        # # Log and print both responses for comparison
+        # logging.info(f"Enhanced Response: {enhanced_response}")
+        # logging.info(f"Standard Response: {standard_response}")
 
     except Exception as e:
         logging.error(f"An error occurred: {e}")

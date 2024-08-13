@@ -39,8 +39,8 @@ def create_pipeline():
             summarisor,
             key_takeaways,
             image_description,
-            plot_insights,
             image_entities,
+            # plot_insights, £ for some reason when there aren't any plots - disrupts the whole thing
             semantic_chunking,
             text_cleaner,
             embedding,

@@ -121,7 +121,6 @@ class StorageManager:
         )
 
     def store_nodes(self, nodes):
-        logging.info("storing nodes")
         # Add nodes to neo4j
         id_map = self.store_nodes_and_relationships(nodes)
         logging.info(f"Node ID Map: {id_map}")

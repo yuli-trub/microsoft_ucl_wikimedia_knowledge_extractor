@@ -5,10 +5,25 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./knowledge_extractor/app_logs:/app/logs
-      - .:/knowledge_extractor # Mount the app code to the container
+      - ./knowledge_extractor:/app # Mount the app code to the container
       - ./knowledge_extractor/data:/app/data
     env_file:
       - ./knowledge_extractor/.env
+    depends_on:
+      - qdrant
+      - neo4j
+
+  retriever:
+    build:
+      context: ./retriever
+      dockerfile: Dockerfile
+    volumes:
+      - ./retriever/app_logs:/app/logs
+      - ./retriever:/app # Mount the app code to the container
+    env_file:
+      - ./retriever/.env
+    ports:
+      - 5000:5000
     depends_on:
       - qdrant
       - neo4j

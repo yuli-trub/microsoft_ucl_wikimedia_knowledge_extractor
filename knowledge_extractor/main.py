@@ -77,14 +77,16 @@ def main() -> None:
         neo4j_config = get_neo4j_config(env_vars)
         qdrant_config = get_qdrant_config(env_vars)
 
-        # Initialise StorageManager
-        storage_manager = StorageManager(neo4j_config, qdrant_config)
-
         # Set up embedding model
         embed_model = initialise_embed_model(env_vars)
 
         # Set up LLM
         llm = initialise_llm(env_vars)
+
+        
+        # Initialise StorageManager
+        storage_manager = StorageManager(neo4j_config, qdrant_config)
+
 
         # === KNOWLEDGE EXTRACTOR PART ===
 
@@ -103,7 +105,7 @@ def main() -> None:
 
         # Store nodes and relationships in Neo4j
         # uncoment later - already stored
-        # storage_manager.store_nodes(pipeline_transformed_nodes)
+        storage_manager.store_nodes(pipeline_transformed_nodes)
 
     except Exception as e:
         logging.error(f"An error occurred: {e}")

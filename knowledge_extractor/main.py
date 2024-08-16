@@ -105,7 +105,7 @@ def main() -> None:
 
         # Store nodes and relationships in Neo4j
         # uncoment later - already stored
-        storage_manager.store_nodes(pipeline_transformed_nodes)
+        # storage_manager.store_nodes(pipeline_transformed_nodes)
 
     except Exception as e:
         logging.error(f"An error occurred: {e}")

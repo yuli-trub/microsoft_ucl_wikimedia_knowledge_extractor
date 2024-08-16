@@ -11,6 +11,8 @@ from scripts.config import (
 )
 import os
 
+import gradio as gr
+
 
 # import storage_manager
 from scripts.storage.storage_manager import StorageManager
@@ -22,9 +24,7 @@ from scripts.retriever.retrievifier import GraphVectorRetriever
 from llama_index.core.query_engine import FLAREInstructQueryEngine
 
 
-def main() -> None:
-    setup_logging()
-
+def process_question(question):
     try:
 
         print("started retriever main")
@@ -105,12 +105,28 @@ def main() -> None:
         logging.info(f"Enhanced Response: {enhanced_response}")
         logging.info(f"Standard Response: {standard_response}")
 
+        return str(enhanced_response), str(standard_response)
+
     except Exception as e:
         logging.error(f"An error occurred: {e}")
         raise
     finally:
         storage_manager.close()
 
+
+def main() -> None:
+    setup_logging()
+
+    iface = gr.Interface(   
+        fn=process_question,
+        inputs="text",
+        outputs=["text", "text"],
+        title="Enhanced vs Standard Response",
+        description="Ask a question and see the difference between an enhanced response (using retrieved context) and a standard response.",
+        examples=[["What is the main characteristics of squirrel and what do they like to eat?"]],
+        output_names=["Enhanced Response", "Standard Response"]
+    )
+    iface.launch(server_name="0.0.0.0", server_port=5000)
 
 if __name__ == "__main__":
     main()

@@ -577,8 +577,12 @@ class PlotInsightsTransformation(OpenAIBaseTransformation):
 
         if not plots_found:
             logging.info("No plots found in the documents. Skipping plot insights extraction.")
-            logging.info(f'random doc {documents[5]}')
-            return documents
+            output_docs = documents + new_nodes
+
+            for node in output_docs:
+                node.metadata["last_transformed"] = str(time.time())
+
+            return output_docs
         
         else:
             output_docs = documents + new_nodes

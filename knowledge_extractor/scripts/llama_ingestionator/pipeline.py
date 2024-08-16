@@ -40,7 +40,7 @@ def create_pipeline():
             # key_takeaways,
             # image_description,
             # image_entities,
-            plot_insights
+            plot_insights,
             semantic_chunking,
             text_cleaner,
             embedding,

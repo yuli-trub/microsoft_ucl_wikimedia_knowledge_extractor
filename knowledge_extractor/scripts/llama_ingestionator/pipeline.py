@@ -35,12 +35,12 @@ def create_pipeline():
     # ingestion pipeline
     pipeline = IngestionPipeline(
         transformations=[
-            entities_extractor,
-            summarisor,
-            key_takeaways,
-            image_description,
-            image_entities,
-            # plot_insights, £ for some reason when there aren't any plots - disrupts the whole thing
+            # entities_extractor,
+            # summarisor,
+            # key_takeaways,
+            # image_description,
+            # image_entities,
+            plot_insights
             semantic_chunking,
             text_cleaner,
             embedding,

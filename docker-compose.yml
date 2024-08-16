@@ -28,20 +28,6 @@ services:
       - qdrant
       - neo4j
 
-  app:
-    build: .
-    volumes:
-      - ./app_logs:/app/app_logs # Mount logs to the host machine
-      - .:/app # Mount the app code to the container
-    env_file:
-      - .env
-    ports:
-      - 3000:3000
-    depends_on:
-      - qdrant
-      - neo4j
-    command: sh -c "python main.py"
-
   qdrant:
     image: qdrant/qdrant
     ports:

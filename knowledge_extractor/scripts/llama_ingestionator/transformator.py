@@ -21,6 +21,7 @@ import base64
 from PIL import Image
 import io
 
+
 # TODO change the source from metadata to relationship dict
 
 env_vars = load_env(
@@ -70,6 +71,7 @@ Settings.text_splitter = SemanticSplitterNodeParser(
 class EmbeddingTransformation(TransformComponent):
     # @log_duration
 
+    # TODO: make it avoid the time metadata
     def __call__(self, documents, text_embed_model, **kwargs):
         logging.info(f"embed model: {text_embed_model}")
         logging.info(f"Processing {len(documents)} nodes")
@@ -270,6 +272,9 @@ class SemanticChunkingTransformation(TransformComponent):
                     node.metadata["needs_embedding"] = True
                 transformed_nodes.append(node)
 
+        for node in transformed_nodes:
+            node.metadata["last_transformed"] = str(time.time())
+
         return transformed_nodes
 
 
@@ -373,7 +378,13 @@ class EntityExtractorTransformation(OpenAIBaseTransformation):
                         )
                         entities_nodes.append(entity_node)
         logging.info(f"Extracted entities")
-        return documents + entities_nodes
+
+        transformed_nodes = documents + entities_nodes
+
+        for node in transformed_nodes:
+            node.metadata["last_transformed"] = str(time.time())
+
+        return transformed_nodes
 
 
 # get nodes summary and save as a child node
@@ -407,7 +418,13 @@ class SummaryTransformation(OpenAIBaseTransformation):
                     node_id=node.node_id
                 )
                 new_nodes.append(summary_node)
-        return documents + new_nodes
+
+        transformed_nodes = documents + new_nodes
+
+        for node in transformed_nodes:
+            node.metadata["last_transformed"] = str(time.time())
+
+        return transformed_nodes
 
 
 class KeyTakeawaysTransformation(OpenAIBaseTransformation):
@@ -439,7 +456,13 @@ class KeyTakeawaysTransformation(OpenAIBaseTransformation):
                     node_id=node.node_id
                 )
                 new_nodes.append(takeaways_node)
-        return documents + new_nodes
+
+        transformed_nodes = documents + new_nodes
+
+        for node in transformed_nodes:
+            node.metadata["last_transformed"] = str(time.time())
+
+        return transformed_nodes
 
 
 def resize_image(image_base64, max_size=(1024, 1024)):
@@ -500,8 +523,13 @@ class ImageDescriptionTransformation(OpenAIBaseTransformation):
                         RelatedNodeInfo(node_id=node.node_id)
                     )
                     new_nodes.append(description_node)
-        return documents + new_nodes
 
+        transformed_nodes = documents + new_nodes
+
+        for node in transformed_nodes:
+            node.metadata["last_transformed"] = str(time.time())
+
+        return transformed_nodes
 
 class PlotInsightsTransformation(OpenAIBaseTransformation):
     def __call__(self, documents, **kwargs):
@@ -554,7 +582,10 @@ class PlotInsightsTransformation(OpenAIBaseTransformation):
         
         else:
             output_docs = documents + new_nodes
-            logging.info(f'plot output docs {(output_docs)}')
+
+            for node in output_docs:
+                node.metadata["last_transformed"] = str(time.time())
+
             return output_docs
 
 
@@ -593,4 +624,10 @@ class ImageEntitiesTransformation(OpenAIBaseTransformation):
                         RelatedNodeInfo(node_id=node.node_id)
                     )
                     new_nodes.append(entities_node)
-        return documents + new_nodes
+
+        transformed_nodes = documents + new_nodes
+
+        for node in transformed_nodes:
+            node.metadata["last_transformed"] = str(time.time())
+
+        return transformed_nodes

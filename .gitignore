@@ -48,7 +48,7 @@ cover/
 
 # dotenv
 .env
-.env.*
+
 
 # IDEs and editors
 .idea/

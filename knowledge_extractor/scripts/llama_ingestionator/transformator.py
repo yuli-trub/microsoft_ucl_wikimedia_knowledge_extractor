@@ -635,3 +635,43 @@ class ImageEntitiesTransformation(OpenAIBaseTransformation):
             node.metadata["last_transformed"] = str(time.time())
 
         return transformed_nodes
+
+
+class TableAnalysisTransformation(OpenAIBaseTransformation):
+    def __call__(self, documents, **kwargs):
+        new_nodes = []
+
+        for idx, node in enumerate(documents):
+            if node.metadata.get("type") == "table":
+                logging.info(f"Analysinng table from node ID: {node.node_id}")
+                context = node.metadata.get("context")
+                prompt = (
+                    f"Analyse the following table data and provide a list of key insights and observations, considering the context: {context}. "
+                     "Please focus on identifying significant trends, patterns, or anomalies, and include any important numerical values that support your analysis. "
+                     "Your output should be a concise and well-structured list of key points, each highlighting an important aspect of the table data. "
+                     "If applicable, include comparisons between different data points or categories and mention any outliers or unexpected results."
+)
+
+                response = self.openai_request(prompt, text=node.text)
+                takeways = self.get_response(response)
+                takeaways_node = TextNode(
+                    text=takeways,
+                    metadata={
+                        "title": f"{node.metadata['title']}_analysis",
+                        "type": "table_analysis",
+                        "source": node.metadata["source"],
+                        "needs_embedding": True,
+                        "context": context,
+                    },
+                )
+                takeaways_node.relationships[NodeRelationship.PARENT] = RelatedNodeInfo(
+                    node_id=node.node_id
+                )
+                new_nodes.append(takeaways_node)
+
+        transformed_nodes = documents + new_nodes
+
+        for node in transformed_nodes:
+            node.metadata["last_transformed"] = str(time.time())
+
+        return transformed_nodes

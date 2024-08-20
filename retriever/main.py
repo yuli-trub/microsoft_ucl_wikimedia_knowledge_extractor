@@ -53,10 +53,6 @@ def process_question(question):
         # Retrieval stage
         retriever = GraphVectorRetriever(storage_manager, embed_model)
 
-        # Example question
-        question = (
-            "What is the main characteristics of squirrel and what do they like to eat?"
-        )
 
         parent_nodes = retriever.fusion_retrieve(question)
         logging.info(
@@ -124,8 +120,9 @@ def main() -> None:
         title="Enhanced vs Standard Response",
         description="Ask a question and see the difference between an enhanced response (using retrieved context) and a standard response.",
         examples=[["What is the main characteristics of squirrel and what do they like to eat?"]],
-        output_names=["Enhanced Response", "Standard Response"]
     )
+
+    # Launch Gradio interface, binding to all network interfaces (0.0.0.0) and the specified port (5000)
     iface.launch(server_name="0.0.0.0", server_port=5000)
 
 if __name__ == "__main__":

@@ -10,6 +10,7 @@ from scripts.llama_ingestionator.transformator import (
     ImageDescriptionTransformation,
     PlotInsightsTransformation,
     ImageEntitiesTransformation,
+    TableAnalysisTransformation
 )
 import logging
 from llama_index.core import Settings
@@ -30,17 +31,19 @@ def create_pipeline():
     image_description = ImageDescriptionTransformation()
     plot_insights = PlotInsightsTransformation()
     image_entities = ImageEntitiesTransformation()
+    table_analysis = TableAnalysisTransformation()
     embedding = EmbeddingTransformation()
 
     # ingestion pipeline
     pipeline = IngestionPipeline(
         transformations=[
-            # entities_extractor,
-            # summarisor,
-            # key_takeaways,
-            # image_description,
-            # image_entities,
+            entities_extractor,
+            summarisor,
+            key_takeaways,
+            image_description,
+            image_entities,
             plot_insights,
+            table_analysis,
             semantic_chunking,
             text_cleaner,
             embedding,

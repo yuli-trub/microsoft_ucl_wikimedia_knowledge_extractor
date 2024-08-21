@@ -18,7 +18,7 @@ services:
       context: ./retriever
       dockerfile: Dockerfile
     volumes:
-      - ./retriever/app_logs:/app/logs
+      - ./retriever/app_logs:/app/app_logs
       - ./retriever:/app # Mount the app code to the container
     env_file:
       - ./retriever/.env

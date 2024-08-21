@@ -20,9 +20,8 @@ from scripts.storage.storage_manager import StorageManager
 # import retriever
 from scripts.retriever.retrievifier import GraphVectorRetriever
 
-# import FLARE
-from llama_index.core.query_engine import FLAREInstructQueryEngine
-
+# import agent and FLARE
+from agents import process_question_with_flare, process_question_with_react
 
 def process_question(question):
     try:
@@ -53,7 +52,7 @@ def process_question(question):
         # Retrieval stage
         retriever = GraphVectorRetriever(storage_manager, embed_model)
 
-
+        # retrieve original nodes 
         parent_nodes = retriever.fusion_retrieve(question)
         logging.info(
             f"Retrieved parent nodes: {[node.metadata['type'] for node in parent_nodes]}"
@@ -64,7 +63,7 @@ def process_question(question):
             parent_nodes
         )
 
-        # === FLARE QUERY ENGINE - QUERY PART===
+        # === QUERY PART ===
         # LLM input
         llm_rag_input = (
             "You are provided with context information retrieved from various sources. "
@@ -85,17 +84,12 @@ def process_question(question):
         )
         llm_input = f"Question: {question}\n\nAnswer:"
 
-        query_engine = index.as_query_engine(multi_modal_llm=llm)
+        # process with FLARE
+        # flare_enhanced_response = process_question_with_flare(llm_rag_input, index, llm)
 
-        flare_query_engine = FLAREInstructQueryEngine(
-            query_engine=query_engine,
-            max_iterations=3,
-            verbose=True,
-        )
-
-        # Query with context
+        # process with ReAct
+        enhanced_response = process_question_with_react(llm_rag_input, retriever, llm)
         standard_response = llm.complete(llm_input)
-        enhanced_response = flare_query_engine.query(llm_rag_input)
 
         # Log and print both responses for comparison
         logging.info(f"Enhanced Response: {enhanced_response}")
@@ -113,17 +107,30 @@ def process_question(question):
 def main() -> None:
     setup_logging()
 
-    iface = gr.Interface(   
-        fn=process_question,
-        inputs="text",
-        outputs=["text", "text"],
-        title="Enhanced vs Standard Response",
-        description="Ask a question and see the difference between an enhanced response (using retrieved context) and a standard response.",
-        examples=[["What is the main characteristics of squirrel and what do they like to eat?"]],
-    )
+    with gr.Blocks() as demo:
+        gr.Markdown("# Enhanced vs Standard Response")
+        gr.Markdown("Ask a question and see the difference between an enhanced response (using retrieved context) and a standard response.")
+        
+        # Full-width question input
+        question = gr.Textbox(label="Enter your question", placeholder="Type your question here...", elem_id="question_box")
 
-    # Launch Gradio interface, binding to all network interfaces (0.0.0.0) and the specified port (5000)
-    iface.launch(server_name="0.0.0.0", server_port=5000)
+        # Example questions below
+        with gr.Row():
+            gr.Examples(examples=[["What are the main characteristics of squirrels and what do they like to eat?"]], inputs=question)
+
+        # Two columns for enhanced and standard responses to compare
+        with gr.Row():
+            with gr.Column():
+                gr.Markdown("## Enhanced Response:")
+                enhanced_response = gr.Markdown(label="Enhanced Response")
+            with gr.Column():
+                gr.Markdown("## Standard Response:")
+                standard_response = gr.Markdown(label="Standard Response")
+
+        # Submit button to process the question
+        question.submit(process_question, inputs=question, outputs=[enhanced_response, standard_response])
+
+    demo.launch(server_name="0.0.0.0", server_port=5000)
 
 if __name__ == "__main__":
     main()

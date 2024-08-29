@@ -26,10 +26,8 @@ from agents import process_question_with_flare, process_question_with_react
 def process_question(question):
     try:
 
-        print("started retriever main")
         # Load environment variables
         env_vars = get_env_vars()
-        logging.info(env_vars)
 
         # Neo4j and Qdrant configurations
         neo4j_config = get_neo4j_config(env_vars)
@@ -106,6 +104,7 @@ def process_question(question):
 
 def main() -> None:
     setup_logging()
+    env_vars = get_env_vars()
 
     with gr.Blocks() as demo:
         gr.Markdown("# Enhanced vs Standard Response")
@@ -130,7 +129,7 @@ def main() -> None:
         # Submit button to process the question
         question.submit(process_question, inputs=question, outputs=[enhanced_response, standard_response])
 
-    demo.launch(server_name="0.0.0.0", server_port=5000)
+    demo.launch(server_name="0.0.0.0", server_port=int(env_vars["UI_SERVER_PORT"]))
 
 if __name__ == "__main__":
     main()

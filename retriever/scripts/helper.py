@@ -25,6 +25,7 @@ def load_env(*keys):
         "DB_NEO4J_PASSWORD": os.getenv("DB_NEO4J_PASSWORD"),
         "COMPUTER_VISION_ENDPOINT": os.getenv("COMPUTER_VISION_ENDPOINT"),
         "COMPUTER_VISION_API_KEY": os.getenv("COMPUTER_VISION_API_KEY"),
+        "UI_SERVER_PORT": os.getenv("UI_SERVER_PORT")
     }
     return {key: env_vars[key] for key in keys}
 

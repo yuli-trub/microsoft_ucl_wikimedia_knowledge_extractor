@@ -14,6 +14,7 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential_jitter,
     retry_if_exception_type,
+    retry_if_exception
 )
 import time
 from scripts.helper import load_env, log_duration
@@ -162,7 +163,7 @@ class OpenAIBaseTransformation(TransformComponent):
     @retry(
         wait=wait_exponential_jitter(initial=1, max=60),
         stop=stop_after_attempt(10),
-        retry=retry_if_exception_type(requests.exceptions.RequestException),
+        retry=retry_if_exception(lambda e: not (isinstance(e, requests.exceptions.RequestException) and e.response is not None and e.response.status_code == 400 and e.response.json().get("error", {}).get("code", "") == "content_filter")),
     )
     def openai_request(self, prompt, image=None, text=None, function=None):
 
@@ -198,6 +199,7 @@ class OpenAIBaseTransformation(TransformComponent):
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
+            response_json = response.json() 
             if response:
                 logging.error(
                     f"Request failed with error: {e}. Response content: {response.content}"
@@ -205,7 +207,13 @@ class OpenAIBaseTransformation(TransformComponent):
             if response and response.status_code == 429:
                 logging.warning("Rate limit exceeded. Retrying...")
                 time.sleep(10)
-
+            
+            if response.status_code == 400 and response_json.get("error", {}).get("code", "") == "content_filter":
+                logging.error(
+                    "The content was blocked by Azure's content management policy due to potentially sensitive content. Skipping this image."
+                )
+                return None
+        
             raise
 
     def get_response(self, response):
@@ -439,23 +447,23 @@ class KeyTakeawaysTransformation(OpenAIBaseTransformation):
                     f"Give a list of key takeaways from this text {node.text}, taking into account given context: {context}"
                     "as output give a string of a list of key takeaways from the text."
                 )
-
                 response = self.openai_request(prompt, text=node.text)
-                takeways = self.get_response(response)
-                takeaways_node = TextNode(
-                    text=takeways,
-                    metadata={
-                        "title": f"{node.metadata['title']}_takeaways",
-                        "type": "key_takeaways",
-                        "source": node.metadata["source"],
-                        "needs_embedding": True,
-                        "context": context,
-                    },
-                )
-                takeaways_node.relationships[NodeRelationship.PARENT] = RelatedNodeInfo(
-                    node_id=node.node_id
-                )
-                new_nodes.append(takeaways_node)
+                if response:
+                    takeways = self.get_response(response)
+                    takeaways_node = TextNode(
+                        text=takeways,
+                        metadata={
+                            "title": f"{node.metadata['title']}_takeaways",
+                            "type": "key_takeaways",
+                            "source": node.metadata["source"],
+                            "needs_embedding": True,
+                            "context": context,
+                        },
+                    )
+                    takeaways_node.relationships[NodeRelationship.PARENT] = RelatedNodeInfo(
+                        node_id=node.node_id
+                    )
+                    new_nodes.append(takeaways_node)
 
         transformed_nodes = documents + new_nodes
 
@@ -485,7 +493,7 @@ class ImageDescriptionTransformation(OpenAIBaseTransformation):
                     f"Creating description for image: {node.metadata['title']}"
                 )
                 context = node.metadata.get("context")
-
+            
                 if node.metadata.get("type") == "image":
                     prompt = f"""Considering the context for the image: {context}.
                                  Please describe the image in detail, covering the main elements visible in the picture. 
@@ -505,24 +513,25 @@ class ImageDescriptionTransformation(OpenAIBaseTransformation):
 
                 resised_image = resize_image(node.image)
                 response = self.openai_request(prompt, image=resised_image)
-                description = self.get_response(response)
-                logging.info(f"Pic Description: {description}")
+                if response:
+                    description = self.get_response(response)
+                    logging.info(f"Pic Description: {description}")
 
-                if "error: unable" not in description:
-                    description_node = TextNode(
-                        text=description,
-                        metadata={
-                            "title": f"{node.metadata['title']}_image_description",
-                            "type": "image_description",
-                            "source": node.metadata["source"],
-                            "needs_embedding": True,
-                            "context": context,
-                        },
-                    )
-                    description_node.relationships[NodeRelationship.PARENT] = (
-                        RelatedNodeInfo(node_id=node.node_id)
-                    )
-                    new_nodes.append(description_node)
+                    if "error: unable" not in description:
+                        description_node = TextNode(
+                            text=description,
+                            metadata={
+                                "title": f"{node.metadata['title']}_image_description",
+                                "type": "image_description",
+                                "source": node.metadata["source"],
+                                "needs_embedding": True,
+                                "context": context,
+                            },
+                        )
+                        description_node.relationships[NodeRelationship.PARENT] = (
+                            RelatedNodeInfo(node_id=node.node_id)
+                        )
+                        new_nodes.append(description_node)
 
         transformed_nodes = documents + new_nodes
 
@@ -554,24 +563,25 @@ class PlotInsightsTransformation(OpenAIBaseTransformation):
 
                 resised_image = resize_image(node.image)
                 response = self.openai_request(prompt, image=resised_image)
-                insights = self.get_response(response)
-                logging.info(f"Plot Insights: {insights}")
+                if response:
+                    insights = self.get_response(response)
+                    logging.info(f"Plot Insights: {insights}")
 
-                if "error: unable" not in insights:
-                    insights_node = TextNode(
-                        text=insights,
-                        metadata={
-                            "title": f"{node.metadata['title']}_plot_insights",
-                            "type": "plot_insights",
-                            "source": node.metadata["source"],
-                            "needs_embedding": True,
-                            "context": context,
-                        },
-                    )
-                    insights_node.relationships[NodeRelationship.PARENT] = (
-                        RelatedNodeInfo(node_id=node.node_id)
-                    )
-                    new_nodes.append(insights_node)
+                    if "error: unable" not in insights:
+                        insights_node = TextNode(
+                            text=insights,
+                            metadata={
+                                "title": f"{node.metadata['title']}_plot_insights",
+                                "type": "plot_insights",
+                                "source": node.metadata["source"],
+                                "needs_embedding": True,
+                                "context": context,
+                            },
+                        )
+                        insights_node.relationships[NodeRelationship.PARENT] = (
+                            RelatedNodeInfo(node_id=node.node_id)
+                        )
+                        new_nodes.append(insights_node)
             else:
                 continue
 
@@ -610,24 +620,25 @@ class ImageEntitiesTransformation(OpenAIBaseTransformation):
 
                 resised_image = resize_image(node.image)
                 response = self.openai_request(prompt, image=resised_image)
-                entities = self.get_response(response)
-                logging.info(f"Image Entities: {entities}")
+                if response:
+                    entities = self.get_response(response)
+                    logging.info(f"Image Entities: {entities}")
 
-                if "error: unable" not in entities:
-                    entities_node = TextNode(
-                        text=entities,
-                        metadata={
-                            "title": f"{node.metadata['title']}_image_entities",
-                            "type": "image_entities",
-                            "source": node.metadata["source"],
-                            "needs_embedding": True,
-                            "context": context,
-                        },
-                    )
-                    entities_node.relationships[NodeRelationship.PARENT] = (
-                        RelatedNodeInfo(node_id=node.node_id)
-                    )
-                    new_nodes.append(entities_node)
+                    if "error: unable" not in entities:
+                        entities_node = TextNode(
+                            text=entities,
+                            metadata={
+                                "title": f"{node.metadata['title']}_image_entities",
+                                "type": "image_entities",
+                                "source": node.metadata["source"],
+                                "needs_embedding": True,
+                                "context": context,
+                            },
+                        )
+                        entities_node.relationships[NodeRelationship.PARENT] = (
+                            RelatedNodeInfo(node_id=node.node_id)
+                        )
+                        new_nodes.append(entities_node)
 
         transformed_nodes = documents + new_nodes
 
@@ -653,21 +664,22 @@ class TableAnalysisTransformation(OpenAIBaseTransformation):
 )
 
                 response = self.openai_request(prompt, text=node.text)
-                takeways = self.get_response(response)
-                takeaways_node = TextNode(
-                    text=takeways,
-                    metadata={
-                        "title": f"{node.metadata['title']}_analysis",
-                        "type": "table_analysis",
-                        "source": node.metadata["source"],
-                        "needs_embedding": True,
-                        "context": context,
-                    },
-                )
-                takeaways_node.relationships[NodeRelationship.PARENT] = RelatedNodeInfo(
-                    node_id=node.node_id
-                )
-                new_nodes.append(takeaways_node)
+                if response:
+                    takeways = self.get_response(response)
+                    takeaways_node = TextNode(
+                        text=takeways,
+                        metadata={
+                            "title": f"{node.metadata['title']}_analysis",
+                            "type": "table_analysis",
+                            "source": node.metadata["source"],
+                            "needs_embedding": True,
+                            "context": context,
+                        },
+                    )
+                    takeaways_node.relationships[NodeRelationship.PARENT] = RelatedNodeInfo(
+                        node_id=node.node_id
+                    )
+                    new_nodes.append(takeaways_node)
 
         transformed_nodes = documents + new_nodes
 

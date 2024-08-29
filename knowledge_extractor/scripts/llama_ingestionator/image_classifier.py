@@ -35,34 +35,6 @@ headers = {
     "api-key": env_vars["AZURE_OPENAI_API_KEY"],
 }
 
-# Payload test for the request from the playground
-payload_test = {
-    "messages": [
-        {
-            "role": "system",
-            "content": [
-                {
-                    "type": "text",
-                    "text": "You are an AI assistant that helps people find information.",
-                }
-            ],
-        },
-        {
-            "role": "user",
-            "content": [{"type": "text", "text": "how would you define a plot?"}],
-        },
-    ],
-    "temperature": 0.7,
-    "top_p": 0.95,
-    "max_tokens": 800,
-}
-# Send request
-# try:
-#     response = requests.post(GPT4V_ENDPOINT, headers=headers, json=payload_test)
-#     response.raise_for_status()
-# except requests.RequestException as e:
-#     raise SystemExit(f"Failed to make the request. Error: {e}")
-
 
 # classify image test
 def encode_image_from_file(image_path):
@@ -154,7 +126,7 @@ def resize_image_if_large(base64_image, max_size=(1024, 1024)):
     retry=retry_if_exception_type(requests.exceptions.RequestException),
     before_sleep=before_sleep_log(logging, logging.WARNING),
 )
-def classify_image_from_memory(image_data):
+def classify_image_from_memory(image_data, image_name):
 
     payload = {
         "messages": [
@@ -172,7 +144,7 @@ def classify_image_from_memory(image_data):
                 "content": [
                     {
                         "type": "text",
-                        "text": "Please classify the following image as either a plot (including plots, graphs, diagrams) or an actual image and output the classification class only.",
+                        "text": f"Please classify the following image of {image_name} as either a plot (including plots, graphs, diagrams) or an actual image and output the classification class only.",
                     },
                     {
                         "type": "image_url",
@@ -190,32 +162,35 @@ def classify_image_from_memory(image_data):
         response = requests.post(GPT4_ENDPOINT, headers=headers, json=payload)
         logging.info(f"Image classification response: {response.json()}")
         response.raise_for_status()
+        response_json = response.json()
+        classification = response_json["choices"][0]["message"]["content"]
+        
+
+
     except requests.exceptions.RequestException as e:
         if response is not None:
+            response_json = response.json()
+
             if response.status_code == 429:
                 logging.warning("Rate limit exceeded. Retrying...")
                 time.sleep(10)
             elif response.status_code == 400 and "image is too large" in response.text:
                 logging.warning("Image is too large. Resizing and retrying...")
                 resized_image = resize_image_if_large(image_data)
-                return classify_image_from_memory(resized_image)
+                return classify_image_from_memory(resized_image, image_name)
+            elif response.status_code == 400  and response_json["error"].get("code", "") == "content_filter":
+                logging.error(
+                    "Image classification was blocked by Azure's content management policy due to potentially sensitive content. Skipping this image."
+                )
+                return "sensitive_image" 
 
         logging.error(f"Failed to classify the image. Error: {e}")
         raise
 
-    return response.json()
+    return classification
 
 
-# Extract and print classification result
-def get_classification(response):
-    try:
-        return response["choices"][0]["message"]["content"]
-    except (KeyError, IndexError):
-        return "Classification failed or unclear"
-
-
-def classify_and_update_image_type(image_data):
-    response = classify_image_from_memory(image_data)
-    logging.info(f"Image classification response: {response}")
-    classification = get_classification(response)
+def classify_and_update_image_type(image_data, image_name):
+    classification = classify_image_from_memory(image_data, image_name)
+    logging.info(f"Image classification response: {classification}")
     return classification.lower() if classification else "unknown"

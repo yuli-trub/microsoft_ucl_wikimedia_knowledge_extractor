@@ -18,6 +18,8 @@ DB_NEO4J_USER = env_vars["DB_NEO4J_USER"]
 DB_NEO4J_PASSWORD = env_vars["DB_NEO4J_PASSWORD"]
 
 
+
+
 class Neo4jClient:
     # initialise the db - connection
     def __init__(self, uri, user, password):
@@ -26,6 +28,26 @@ class Neo4jClient:
     # close connection
     def close(self):
         self.driver.close()
+
+    # check if db exists
+    def database_exists(self, database_name: str) -> bool:
+        with self.driver.session(database="system") as session:
+            result = session.run(
+                "SHOW DATABASES YIELD name WHERE name = $name RETURN name",
+                name=database_name
+            )
+            return result.single() is not None
+        
+    # create db
+    def create_database(self, database_name: str):
+        with self.driver.session(database="system") as session:
+            session.run(f"CREATE DATABASE {database_name}")
+            logging.info(f"Database {database_name} created.")
+
+    def start_database(self, database_name: str):
+        with self.driver.session(database="system") as session:
+            session.run(f"START DATABASE {database_name}")
+            logging.info(f"Database {database_name} started.")
 
     # create a Document node
     def create_document_node(self, node: Document):

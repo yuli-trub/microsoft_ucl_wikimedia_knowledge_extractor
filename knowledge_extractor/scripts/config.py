@@ -18,6 +18,8 @@ def get_env_vars():
         "DB_NEO4J_URI",
         "DB_NEO4J_USER",
         "DB_NEO4J_PASSWORD",
+        "DOMAIN_TOPIC",
+        "NUM_WIKI_PAGES"
     )
 
 

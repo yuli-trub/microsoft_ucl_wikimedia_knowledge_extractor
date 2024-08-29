@@ -111,7 +111,7 @@ def process_images(images, main_document, document_summary):
     prev_image_node = None
     for image in images:
         logging.info(f"Processing image - classifying: {image['image_name']}")
-        image_type = classify_and_update_image_type(image["image_data"])
+        image_type = classify_and_update_image_type(image["image_data"], image['image_name'])
         if "image" in image_type:
             image_type = "image"
         logging.info(f"Image type: {image_type}")

@@ -14,10 +14,10 @@ from dotenv import load_dotenv
 import logging
 import gc
 from scripts.helper import log_duration
+import cairosvg
 
 load_dotenv()
 USER_AGENT = os.getenv("USER_AGENT")
-# CONFIG_CAIRO_PATH = os.getenv("CONFIG_CAIRO_PATH")
 
 
 try:

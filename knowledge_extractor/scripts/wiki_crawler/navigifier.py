@@ -4,6 +4,9 @@ import os
 
 wikipedia = MediaWiki(user_agent="KnowledgeExtractor/1.0 (ucabytr@ucl.ac.uk)")
 
+def search_page_titles(topic, num_pages):
+    search_results = wikipedia.search(topic, results=num_pages, suggestion=True)
+    return search_results
 
 def get_wiki_page(title):
     """initialises the page
@@ -269,12 +272,4 @@ def process_and_save_sections(page, base_dir):
                     )
 
 
-# print(get_page_html(get_wiki_page("Python (programming language)")))
-# print(get_intro_content((get_page_content((get_wiki_page("Mount Everest"))))))
-# print(extract_section_titles(get_page_content((get_wiki_page("Mount Everest")))))
 
-# print(
-#     get_section_content((((get_wiki_page("Python (programming language)")))), "History")
-# )
-
-# print(sanitise_filename("1979/1980: Winter Himalaism"))

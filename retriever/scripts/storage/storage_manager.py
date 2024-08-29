@@ -10,6 +10,7 @@ import time
 class StorageManager:
     def __init__(self, neo4j_config, qdrant_config, max_retries=10, wait_time=5):
         self.neo4j_client = Neo4jClient(**neo4j_config)
+
         self.embed_model = Settings.embed_model
 
         for attempt in range(max_retries):
@@ -33,6 +34,14 @@ class StorageManager:
                     raise Exception("Failed to set up Qdrant client after several attempts.")
 
       
+    # set up db and check if it exists
+    def setup_neo4j_database(neo4j_client: Neo4jClient, database_name: str):
+        if not neo4j_client.database_exists(database_name):
+            neo4j_client.create_database(database_name)
+            neo4j_client.start_database(database_name)
+        else:
+            logging.info(f"Database {database_name} already exists.")
+
 
     def store_nodes_and_relationships(self, nodes):
         neo4j_client = self.neo4j_client

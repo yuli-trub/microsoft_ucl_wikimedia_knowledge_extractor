@@ -25,19 +25,21 @@ def load_env(*keys):
         "DB_NEO4J_PASSWORD": os.getenv("DB_NEO4J_PASSWORD"),
         "COMPUTER_VISION_ENDPOINT": os.getenv("COMPUTER_VISION_ENDPOINT"),
         "COMPUTER_VISION_API_KEY": os.getenv("COMPUTER_VISION_API_KEY"),
+        "DOMAIN_TOPIC": os.getenv("DOMAIN_TOPIC"),
+        "NUM_WIKI_PAGES": os.getenv("NUM_WIKI_PAGES"),
     }
     return {key: env_vars[key] for key in keys}
 
 
 # load documents
-def save_documents_to_file(documents, filename="documents.pkl"):
+def save_documents_to_file(documents, filename):
     os.makedirs(os.path.dirname(filename), exist_ok=True)
 
     with open(filename, "wb") as f:
         pickle.dump(documents, f)
 
 
-def load_documents_from_file(filename="documents.pkl"):
+def load_documents_from_file(filename):
     with open(filename, "rb") as f:
         return pickle.load(f)
 

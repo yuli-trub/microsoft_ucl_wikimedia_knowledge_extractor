@@ -13,7 +13,7 @@ from scripts.wiki_crawler.referenciator import (
 from scripts.wiki_crawler.imagifier import convert_images_to_png
 
 
-# scripts.helper function to fetch all of the cleaned data from the wiki page in a structured format
+# scripts.helper function to fetch all of the cleaned data from the one wiki page in a structured format
 def fetch_wiki_data(page_title):
     page = get_wiki_page(page_title)
     if not page:
@@ -50,3 +50,4 @@ def fetch_wiki_data(page_title):
         wiki_links_dict,
         table_of_contents,
     )
+

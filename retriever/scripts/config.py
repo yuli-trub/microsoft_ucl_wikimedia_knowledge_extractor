@@ -18,6 +18,7 @@ def get_env_vars():
         "DB_NEO4J_URI",
         "DB_NEO4J_USER",
         "DB_NEO4J_PASSWORD",
+        "UI_SERVER_PORT"
     )
 
 
@@ -51,6 +52,7 @@ def get_neo4j_config(env_vars):
         "uri": env_vars["DB_NEO4J_URI"],
         "user": env_vars["DB_NEO4J_USER"],
         "password": env_vars["DB_NEO4J_PASSWORD"],
+        # "database_name"
     }
 
 

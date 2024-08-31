@@ -2,6 +2,7 @@ from scripts.helper import (
     load_env,
     save_documents_to_file,
     load_documents_from_file,
+    sanitise_filename
 )
 from scripts.llama_ingestionator.documentifier import process_page_into_doc_and_nodes
 import logging
@@ -16,7 +17,7 @@ from scripts.config import (
     get_qdrant_config,
 )
 
-from scripts.wiki_crawler.navigifier import search_page_titles
+from scripts.wiki_crawler.searchinator import search_wiki
 import os
 
 # import pipeline
@@ -29,18 +30,19 @@ import re
 
 
 
-def get_initial_nodes(topic="test", num_pages=1) -> list:
+def get_initial_nodes(topic="test", num_pages=1, wiki_url = None) -> list:
     """Load initial nodes from a file or process a page to create them."""
     
-    clean_topic = re.sub(r'[\\/*?:"<>|]', "_", topic)
-    filename = f'./data/{clean_topic}_initial'
+    clean_topic = sanitise_filename(topic)
+    # to change later after cleaning
+    filename = f'./data/{clean_topic}_initial_test'
 
     try:
         if os.path.exists(filename):
             documents = load_documents_from_file(filename)
             logging.info(f"Loaded {len(documents)} documents from {filename}")
         else:
-            search_results = search_page_titles(topic, num_pages)[0]
+            search_results = search_wiki(topic, wiki_url, num_pages)[0]
             logging.info(f'search results: {search_results}')
             documents=[]
             for title in search_results:
@@ -59,7 +61,7 @@ def create_transformed_nodes(
 ) -> list:
     """Transform and save nodes using the pipeline."""
 
-    clean_topic = re.sub(r'[\\/*?:"<>|]', "_", topic)
+    clean_topic = sanitise_filename(topic)
     filename = f'./data/{clean_topic}_pipeline'
     try:
         if os.path.exists(filename):
@@ -115,19 +117,19 @@ def main() -> None:
         logging.info(f'topic: {topic}, num_pages: {num_pages}')
         initial_documents = get_initial_nodes(topic, num_pages)
 
-        # Initialise the pipeline
-        pipeline = create_pipeline()
+        # # Initialise the pipeline
+        # pipeline = create_pipeline()
 
-        # Load or create transformed nodes
-        # test_filename = "./data/squirrel-pipeline-image_embed_test.pkl"
-        pipeline_transformed_nodes = create_transformed_nodes(
-            initial_documents, env_vars['DOMAIN_TOPIC'], pipeline, embed_model
-        )
+        # # Load or create transformed nodes
+        # # test_filename = "./data/squirrel-pipeline-image_embed_test.pkl"
+        # pipeline_transformed_nodes = create_transformed_nodes(
+        #     initial_documents, env_vars['DOMAIN_TOPIC'], pipeline, embed_model
+        # )
 
-        # Store nodes and relationships in Neo4j
-        # uncoment later - already stored
-        for page in pipeline_transformed_nodes:
-            storage_manager.store_nodes(page)
+        # # Store nodes and relationships in Neo4j
+        # # uncoment later - already stored
+        # for page in pipeline_transformed_nodes:
+        #     storage_manager.store_nodes(page)
 
     except Exception as e:
         logging.error(f"An error occurred: {e}")

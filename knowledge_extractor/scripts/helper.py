@@ -4,6 +4,7 @@ import pickle
 import hashlib
 import time
 import logging
+import re
 
 
 # get env variables
@@ -63,3 +64,25 @@ def log_duration(func):
         return result
 
     return wrapper
+
+
+def sanitise_filename(filename):
+    """
+    Sanitise a string to be used as a filename
+
+    Parameters
+        filename : str
+            The string to sanitise
+
+    Returns
+            safe_filename : str
+                The sanitised filename
+    """
+    invalid_chars = r'<>:,"/\\|?*'
+    for char in invalid_chars:
+        filename = filename.replace(char, "-")
+
+    # replace -- with single -
+    filename = re.sub(r"[\s-]+", "-", filename)
+
+    return filename

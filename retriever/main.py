@@ -115,7 +115,7 @@ def main() -> None:
 
         # Example questions below
         with gr.Row():
-            gr.Examples(examples=[["What are the main characteristics of squirrels and what do they like to eat?"]], inputs=question)
+            gr.Examples(examples=[["When was the Eiffel Tower built, and what was its original purpose?"]], inputs=question)
 
         # Two columns for enhanced and standard responses to compare
         with gr.Row():

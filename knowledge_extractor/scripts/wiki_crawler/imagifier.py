@@ -1,4 +1,3 @@
-from mediawiki import MediaWiki
 import requests
 from PIL import Image
 from PIL import UnidentifiedImageError
@@ -7,14 +6,14 @@ import io
 from bs4 import BeautifulSoup
 import re
 import base64
-import sys
 import ctypes
-from openai import AzureOpenAI
 from dotenv import load_dotenv
 import logging
 import gc
 from scripts.helper import log_duration
 import cairosvg
+import logging
+from scripts.helper import sanitise_filename
 
 load_dotenv()
 USER_AGENT = os.getenv("USER_AGENT")
@@ -31,12 +30,8 @@ except OSError as e:
 Image.MAX_IMAGE_PIXELS = None
 
 
-def save_svg(svg_content, file_path):
-    with open(file_path, "wb") as file:
-        file.write(svg_content)
-
-
 def preprocess_svg(svg_content):
+    """Preprocess SVG content by adding width and height attributes if missing."""
     try:
         soup = BeautifulSoup(svg_content, "xml")
         svg_tag = soup.find("svg")
@@ -45,35 +40,17 @@ def preprocess_svg(svg_content):
             svg_tag["height"] = "1000"
         return str(soup)
     except Exception as e:
-        print(f"Error preprocessing SVG: {e}")
+        logging.error(f"Error preprocessing SVG: {e}")
         return svg_content
 
 
-def save_image(image_data, file_path):
-    with open(file_path, "wb") as file:
-        file.write(image_data)
-
-
 def is_image_too_small(image_data, min_size=(50, 50)):
+    """Check if the image is too small."""
     try:
         image = Image.open(io.BytesIO(image_data))
         return image.size[0] < min_size[0] or image.size[1] < min_size[1]
     except UnidentifiedImageError:
         return False
-
-
-def clean_filename(filename):
-    return re.sub(r'[\\/*?:"<>|]', "", filename)
-
-
-def encode_image_from_file(image_path):
-    with open(image_path, "rb") as image_file:
-        image_data = image_file.read()
-        return base64.b64encode(image_data).decode("utf-8")
-
-
-def encode_image_from_memory(image_data):
-    return base64.b64encode(image_data).decode("utf-8")
 
 
 def resize_image_if_large(image_data, max_pixels=178956970):
@@ -92,123 +69,15 @@ def resize_image_if_large(image_data, max_pixels=178956970):
     return image_data
 
 
-# def convert_images_to_png(page, min_size=(50, 50), batch_size=10):
-#     """
-#     Download all images from a wiki page and convert them to PNG format
-
-#     Parameters
-#         page_title : string
-#             title of the wiki page
-#         url : string
-#             URL of the MediaWiki API
-#         min_size : tuple
-#             minimum size of the image to be downloaded
-
-#     Returns
-#         None
-#     """
-
-#     images = page.images
-
-#     headers = {"User-Agent": USER_AGENT}
-
-#     png_images = []
-
-#     for i in range(0, len(images), batch_size):
-#         batch = images[i : i + batch_size]
-#         for image_url in batch:
-#             try:
-#                 response = requests.get(image_url, headers=headers, stream=True)
-#                 response.raise_for_status()
-#                 image_data = response.content
-#                 image_name = os.path.basename(image_url)
-#                 image_name = clean_filename(image_name)
-#                 image_name_without_ext = os.path.splitext(image_name)[0]
-
-#                 if is_image_too_small(image_data, min_size):
-#                     logging.info(
-#                         f"Skipping image {image_name} as it is too small."
-#                     )
-#                     continue
-
-#                 if image_url.endswith(".svg"):
-#                     preprocessed_svg = preprocess_svg(image_data.decode("utf-8"))
-#                     try:
-
-#                         png_data = cairosvg.svg2png(
-#                             bytestring=preprocessed_svg.encode("utf-8")
-#                         )
-#                         png_images.append(
-#                             {
-#                                 "image_data": base64.b64encode(png_data).decode(
-#                                     "utf-8"
-#                                 ),
-#                                 "image_name": image_name_without_ext,
-#                             }
-#                         )
-#                         logging.info(
-#                             f"Converted SVG to PNG: {image_name_without_ext}"
-#                         )
-#                     except Exception as e:
-#                         print(
-#                             f"Error converting SVG to PNG for URL: {image_url}. Error: {e}"
-#                         )
-#                 else:
-#                     try:
-#                         image_data = resize_image_if_large(image_data)
-#                         image = Image.open(io.BytesIO(image_data))
-#                         png_buffer = io.BytesIO()
-#                         if image.format != "PNG":
-#                             if image.mode == "CMYK":
-#                                 image = image.convert("RGB")
-#                             image.save(png_buffer, format="PNG")
-#                             png_data = png_buffer.getvalue()
-#                             png_images.append(
-#                                 {
-#                                     "image_data": base64.b64encode(png_data).decode(
-#                                         "utf-8"
-#                                     ),
-#                                     "image_name": image_name_without_ext,
-#                                 }
-#                             )
-#                             logging.info(
-#                                 f"Converted image to PNG: {image_name_without_ext}"
-#                             )
-#                         else:
-#                             png_images.append(
-#                                 {
-#                                     "image_data": base64.b64encode(image_data).decode(
-#                                         "utf-8"
-#                                     ),
-#                                     "image_name": image_name_without_ext,
-#                                 }
-#                             )
-#                             logging.info(
-#                                 f"Saved PNG image: {image_name_without_ext}"
-#                             )
-#                     except UnidentifiedImageError:
-#                         print(f"Unable to identify image at URL: {image_url}")
-
-#             except requests.exceptions.RequestException as e:
-#                 print(f"Error downloading image from URL: {image_url}. Error: {e}")
-
-#         del batch
-#         gc.collect()
-#     logging.info(
-#         f"Total images converted: {len(png_images)}"
-#     )  # todo: remove later
-
-#     return png_images
-
-
 @log_duration
 def process_image(image_url, headers, min_size):
+    """Download and process the image to convert it to PNG format."""
     try:
         response = requests.get(image_url, headers=headers, stream=True)
         response.raise_for_status()
         image_data = response.content
         image_name = os.path.basename(image_url)
-        image_name = clean_filename(image_name)
+        image_name = sanitise_filename(image_name)
         image_name_without_ext = os.path.splitext(image_name)[0]
 
         if is_image_too_small(image_data, min_size):

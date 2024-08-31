@@ -1,12 +1,29 @@
 from mediawiki import MediaWiki
 import re
 import os
+import logging
+from dotenv import load_dotenv
 
-wikipedia = MediaWiki(user_agent="KnowledgeExtractor/1.0 (ucabytr@ucl.ac.uk)")
 
-def search_page_titles(topic, num_pages):
-    search_results = wikipedia.search(topic, results=num_pages, suggestion=True)
-    return search_results
+# get env variables
+load_dotenv()
+url = os.getenv("WIKI_API_URL")
+user_agent = os.getenv("WIKI_USER_AGENT")
+
+# initialise the mediawiki object
+wikipedia = MediaWiki(user_agent=user_agent)
+
+# set the api url if exists, otherwise use default wikipedia
+if url and url.strip():
+        try:
+            wikipedia.set_api_url(url)
+        except Exception as e:
+            logging.error(f"Error setting API URL: {e}. Defaulting to Wikipedia.")
+            wikipedia.set_api_url("https://en.wikipedia.org/w/api.php")
+else:
+        logging.warning("Empty or invalid API URL. Defaulting to Wikipedia.")
+        wikipedia.set_api_url("https://en.wikipedia.org/w/api.php")
+
 
 def get_wiki_page(title):
     """initialises the page
@@ -25,7 +42,7 @@ def get_wiki_page(title):
         page = wikipedia.page(title)
         return page
     except Exception as e:
-        print(f"Error retrieving page {title}: {e}")
+        logging.error(f"Error retrieving page {title}: {e}")
         return None
 
 
@@ -43,7 +60,7 @@ def get_page_categories(page):
     try:
         return page.categories
     except Exception as e:
-        print(f"Failed to retrieve page categories: {e}")
+        logging.error(f"Failed to retrieve page categories: {e}")
         return []
 
 
@@ -62,7 +79,7 @@ def get_page_content(page):
     try:
         return page.content
     except Exception as e:
-        print(f"Failed to retrieve page content: {e}")
+        logging.error(f"Failed to retrieve page content: {e}")
         return ""
 
 
@@ -80,7 +97,7 @@ def get_page_sections(page):
     try:
         return page.sections
     except Exception as e:
-        print(f"Failed to retrieve page sections: {e}")
+        logging.error(f"Failed to retrieve page sections: {e}")
         return []
 
 
@@ -100,7 +117,7 @@ def get_section_content(page, section_title):
     try:
         return page.section(section_title)
     except Exception as e:
-        print(f"Failed to retrieve section '{section_title}' content: {e}")
+        logging.error(f"Failed to retrieve section '{section_title}' content: {e}")
         return ""
 
 
@@ -118,7 +135,7 @@ def get_page_html(page):
     try:
         return page.html
     except Exception as e:
-        print(f"Failed to retrieve page HTML: {e}")
+        logging.error(f"Failed to retrieve page HTML: {e}")
         return ""
 
 
@@ -176,100 +193,7 @@ def extract_section_titles(page_content):
     return sections
 
 
-# scripts.helper fucntion to save to dir
-def sanitise_filename(filename):
-    """
-    Sanitise a string to be used as a filename
 
-    Parameters
-        filename : str
-            The string to sanitise
-
-    Returns
-            safe_filename : str
-                The sanitised filename
-    """
-    invalid_chars = r'<>:,"/\\|?*'
-    for char in invalid_chars:
-        filename = filename.replace(char, "-")
-
-    # replace -- with single -
-    filename = re.sub(r"[\s-]+", "-", filename)
-
-    return filename
-
-
-# TODO: figure out references and references section - avoid or match with urls retrieved with API
-
-
-# get content for each section and subsection and save it in a dictionary hierarchiecally
-def save_content_to_file(base_dir, section_title, content, is_subsection=False):
-    """
-    Save content to a file in the specified directory
-
-    Parameters:
-        base_dir : str
-            The base directory to save the content
-        section_title : str
-            The title of the section or subsection
-        content : str
-            The content to save
-        is_subsection : bool, optional
-            Whether the content is in a subsection. Default = False
-
-    Returns:
-        None
-    """
-
-    filename = sanitise_filename(section_title) + ".txt"
-    file_path = os.path.join(base_dir, filename)
-
-    with open(file_path, "w", encoding="utf-8") as file:
-        file.write(f"{content}")
-
-
-def process_and_save_sections(page, base_dir):
-    """
-    Process and save the sections and subsections of a Wikipedia page
-
-    Parameters:
-        page : MediaWikiPage
-            The Wikipedia page to process
-        base_dir : str
-            The base directory to save the content
-
-    Returns:
-        None
-    """
-    os.makedirs(base_dir, exist_ok=True)
-
-    intro_content = get_intro_content(page.content)
-
-    if intro_content:
-        os.makedirs(f"{base_dir}/Introduction", exist_ok=True)
-        save_content_to_file(f"{base_dir}/Introduction", "Introduction", intro_content)
-
-    sections = extract_section_titles(page.content)
-
-    for section_title, subsections in sections:
-        section_content = get_section_content(page, section_title)
-        if section_content:
-            section_dir = os.path.join(base_dir, sanitise_filename(section_title))
-            os.makedirs(section_dir, exist_ok=True)
-            save_content_to_file(section_dir, section_title, section_content)
-
-            for subsection_title in subsections:
-                subsection_content = get_section_content(page, subsection_title)
-                if subsection_content:
-                    os.makedirs(
-                        f"{section_dir}/{sanitise_filename(subsection_title)}",
-                        exist_ok=True,
-                    )
-                    save_content_to_file(
-                        f"{section_dir}/{sanitise_filename(subsection_title)}",
-                        f"sub_{subsection_title}",
-                        subsection_content,
-                    )
 
 
 

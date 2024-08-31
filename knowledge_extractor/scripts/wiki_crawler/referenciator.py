@@ -1,6 +1,7 @@
-from mediawiki import MediaWiki
-from scripts.wiki_crawler.navigifier import get_page_sections, get_section_content
+from scripts.wiki_crawler.navigifier import get_page_sections
 import logging
+
+# TODO: check if this is still needed annd works
 
 
 def get_all_page_links(page):
@@ -48,7 +49,6 @@ def get_references(page):
     """
 
     sections = get_page_sections(page)
-    # it should include it I think - but extra check?
     references = {}
     for section in sections:
         try:
@@ -64,7 +64,6 @@ def get_references(page):
     return references
 
 
-# get links to other wiki pages mentined in each section?
 def get_external_links_by_section(page):
     """
     Get external links to wikipedia pages by section from a Wiki page.
@@ -99,7 +98,6 @@ def get_external_links_by_section(page):
     return external_links
 
 
-# get all the site notes in sections - to match to ref links later
 def get_cite_note_links_by_section(page):
     """
     Get cite_note links by section from a Wiki page.
@@ -216,7 +214,6 @@ def map_references_to_tuples(references):
     return mapped_references
 
 
-# map out the cite refs with sections
 def create_section_links_dict(sections_with_refs, mapped_references):
     """
     Create a dictionary with sections and their actual and archived links.
@@ -271,22 +268,5 @@ def create_section_links_dict(sections_with_refs, mapped_references):
 def get_all_citations(page):
     sections_with_refs = get_cite_note_links_by_section(page)
     mapped_references = map_references_to_tuples(get_reference_section_links(page))
-    logging.info(f"sections_with_refs: {sections_with_refs}")
-    logging.info(f"mapped_references: {mapped_references}")
     citations = create_section_links_dict(sections_with_refs, mapped_references)
     return citations
-
-
-# test
-wikipedia = MediaWiki(user_agent="KnowledgeExtractor/1.0 (ucabytr@ucl.ac.uk)")
-page = wikipedia.page("Python (programming language)")
-# print(get_references(page))
-# print(get_all_page_links(page))
-
-# print(get_all_citations(page))
-
-# print(map_references_to_tuples(get_reference_section_links(page)))
-
-
-# todo - maybe need references linked to sentences to create child sentence node and ref node?
-# print(get_external_links_by_section(page))

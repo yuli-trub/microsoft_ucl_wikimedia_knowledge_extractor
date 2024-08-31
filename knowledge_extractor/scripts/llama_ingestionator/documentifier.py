@@ -5,8 +5,7 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
 from scripts.wiki_crawler.navigifier import (
-    get_section_content,
-    sanitise_filename,
+    get_section_content
 )
 
 from scripts.llama_ingestionator.image_classifier import classify_and_update_image_type
@@ -28,7 +27,7 @@ from scripts.llama_ingestionator.node_creator import (
 )
 from llama_index.core.schema import NodeRelationship, RelatedNodeInfo
 import logging
-from scripts.helper import log_duration
+from scripts.helper import log_duration, sanitise_filename
 
 
 # create main doc

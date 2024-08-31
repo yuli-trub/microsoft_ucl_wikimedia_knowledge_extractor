@@ -1,7 +1,13 @@
 from mediawiki import MediaWiki
+import logging
+import os
+from dotenv import load_dotenv
 
+# get env variables
+load_dotenv()
+user_agent = os.getenv("WIKI_USER_AGENT")
 
-def search_wiki(query, url=None, results=4, suggestions=False):
+def search_wiki(query, url=None, results=2, suggestions=False):
     """
     Search for Wikipedia pages matching the query
 
@@ -19,20 +25,17 @@ def search_wiki(query, url=None, results=4, suggestions=False):
         list
             list of top 10 relevant of Wikipedia page titles matching the query
     """
-    wikipedia = MediaWiki(user_agent="KnowledgeExtractor/1.0 (ucabytr@ucl.ac.uk)")
+    wikipedia = MediaWiki(user_agent=user_agent)
     if url:
         try:
             wikipedia.set_api_url(url)
         except Exception as e:
-            print(f"Error setting API URL: {e}. Defaulting to Wikipedia.")
+            logging.error(f"Error setting API URL: {e}. Defaulting to Wikipedia.")
             wikipedia.set_api_url("https://en.wikipedia.org/w/api.php")
 
     try:
         results = wikipedia.search(query, results=results, suggestion=suggestions)
         return results
     except Exception as e:
-        print(f"Error searching Wikipedia: {e}")
+        logging.error(f"Error searching Wikipedia: {e}")
         return []
-
-
-# print(search_wiki("Spider-Man", url="https://marvel.fandom.com/api.php"))

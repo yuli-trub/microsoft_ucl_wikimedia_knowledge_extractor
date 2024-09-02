@@ -9,6 +9,7 @@ import re
 
 # get env variables
 def load_env(*keys):
+    """ Load environment variables """
     load_dotenv()
     env_vars = {
         "AZURE_OPENAI_API_KEY": os.getenv("AZURE_OPENAI_API_KEY"),
@@ -34,6 +35,7 @@ def load_env(*keys):
 
 # load documents
 def save_documents_to_file(documents, filename):
+    ""' Save documents to a file '""
     os.makedirs(os.path.dirname(filename), exist_ok=True)
 
     with open(filename, "wb") as f:
@@ -41,14 +43,10 @@ def save_documents_to_file(documents, filename):
 
 
 def load_documents_from_file(filename):
+    """ Load documents from a file """
     with open(filename, "rb") as f:
         return pickle.load(f)
 
-
-# generate hash
-def generate_document_hash(document):
-    document_str = str(document.metadata) + document.text
-    return hashlib.sha256(document_str.encode("utf-8")).hexdigest()
 
 
 # log duration

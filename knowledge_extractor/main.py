@@ -26,64 +26,9 @@ from scripts.llama_ingestionator.pipeline import create_pipeline, run_pipeline
 # import storage_manager
 from scripts.storage.storage_manager import StorageManager
 
-import re
+# import data processing
+from scripts.data_processing import get_initial_nodes, create_transformed_nodes
 
-
-
-def get_initial_nodes(topic="test", num_pages=1, wiki_url = None) -> list:
-    """Load initial nodes from a file or process a page to create them."""
-    
-    clean_topic = sanitise_filename(topic)
-    # to change later after cleaning
-    filename = f'./data/{clean_topic}_initial_test'
-
-    try:
-        if os.path.exists(filename):
-            documents = load_documents_from_file(filename)
-            logging.info(f"Loaded {len(documents)} documents from {filename}")
-        else:
-            search_results = search_wiki(topic, wiki_url, num_pages)[0]
-            logging.info(f'search results: {search_results}')
-            documents=[]
-            for title in search_results:
-                results = process_page_into_doc_and_nodes(title) 
-                documents.append(results)
-            save_documents_to_file(documents, filename)
-            logging.info(f"Processed and saved {len(documents)} documents")
-    except Exception as e:
-        logging.error(f"Failed to get initial nodes: {e}")
-        raise
-    return documents
-
-
-def create_transformed_nodes(
-    documents: list, topic: str, pipeline, embed_model
-) -> list:
-    """Transform and save nodes using the pipeline."""
-
-    clean_topic = sanitise_filename(topic)
-    filename = f'./data/{clean_topic}_pipeline'
-    try:
-        if os.path.exists(filename):
-            pipeline_transformed_nodes = load_documents_from_file(filename)
-            logging.info(
-                f"Loaded {len(pipeline_transformed_nodes)} documents from {filename}"
-            )
-        else:
-            logging.info(f"Processing {len(documents)} documents")
-            pipeline_transformed_nodes =[]
-            for doc in documents:
-                logging.info(f"Processing {len(doc)} documents")
-                transformaed_nodes = run_pipeline(doc, pipeline, embed_model)
-                logging.info(
-                    f"Processed and saved {len(transformaed_nodes)} documents"
-                )
-                pipeline_transformed_nodes.append(transformaed_nodes)
-            save_documents_to_file(pipeline_transformed_nodes, filename)
-    except Exception as e:
-        logging.error(f"Failed to create transformed nodes: {e}")
-        raise
-    return pipeline_transformed_nodes
 
 
 def main() -> None:
@@ -117,19 +62,19 @@ def main() -> None:
         logging.info(f'topic: {topic}, num_pages: {num_pages}')
         initial_documents = get_initial_nodes(topic, num_pages)
 
-        # # Initialise the pipeline
-        # pipeline = create_pipeline()
+        # Initialise the pipeline
+        pipeline = create_pipeline()
 
-        # # Load or create transformed nodes
-        # # test_filename = "./data/squirrel-pipeline-image_embed_test.pkl"
-        # pipeline_transformed_nodes = create_transformed_nodes(
-        #     initial_documents, env_vars['DOMAIN_TOPIC'], pipeline, embed_model
-        # )
+        # Load or create transformed nodes
+        # test_filename = "./data/squirrel-pipeline-image_embed_test.pkl"
+        pipeline_transformed_nodes = create_transformed_nodes(
+            initial_documents, env_vars['DOMAIN_TOPIC'], pipeline, embed_model
+        )
 
-        # # Store nodes and relationships in Neo4j
-        # # uncoment later - already stored
-        # for page in pipeline_transformed_nodes:
-        #     storage_manager.store_nodes(page)
+        # Store nodes and relationships in Neo4j
+        # uncoment later - already stored
+        for page in pipeline_transformed_nodes:
+            storage_manager.store_nodes(page)
 
     except Exception as e:
         logging.error(f"An error occurred: {e}")

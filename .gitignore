@@ -30,6 +30,8 @@ dist/
 # Logs
 *.log
 app_logs/
+logs/
+flagged/    
 
 # Unit test / coverage reports
 htmlcov/

@@ -6,6 +6,7 @@ from scripts.storage.storage_manager import StorageManager
 
 
 def initialise_embed_model(env_vars):
+    """Initialise the embedding model"""
     embed_model = AzureOpenAIEmbedding(
         model="text-embedding-ada-002",
         deployment_name=env_vars["EMBEDDING_DEPLOYMENT_ID"],
@@ -18,6 +19,7 @@ def initialise_embed_model(env_vars):
 
 
 def initialise_llm(env_vars):
+    """Initialise the language model"""
     GPT4_ENDPOINT = f'{env_vars["OPENAI_ENDPOINT"]}/openai/deployments/{env_vars["GPT4O_DEPLOYMENT_ID"]}/chat/completions?api-version={env_vars["GPT4O_API_VERSION"]}'
     llm = AzureOpenAI(
         model="gpt-4o",
@@ -31,4 +33,5 @@ def initialise_llm(env_vars):
 
 
 def initialise_storage_manager(neo4j_config, qdrant_config):
+    """Initialise the storage manager"""
     return StorageManager(neo4j_config, qdrant_config)

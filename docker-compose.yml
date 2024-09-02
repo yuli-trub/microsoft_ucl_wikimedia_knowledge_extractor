@@ -4,7 +4,7 @@ services:
       context: ./knowledge_extractor
       dockerfile: Dockerfile
     volumes:
-      - ./knowledge_extractor/app_logs:/app/logs
+      - ./knowledge_extractor/app_logs:/app/app_logs
       - ./knowledge_extractor:/app # Mount the app code to the container
       - ./knowledge_extractor/data:/app/data
     env_file:

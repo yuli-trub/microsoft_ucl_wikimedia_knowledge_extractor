@@ -1,5 +1,5 @@
 from scripts.helper import log_duration
-from llama_index.core.ingestion import IngestionPipeline, IngestionCache
+from llama_index.core.ingestion import IngestionPipeline
 from scripts.llama_ingestionator.transformator import (
     TextCleaner,
     SemanticChunkingTransformation,
@@ -12,15 +12,12 @@ from scripts.llama_ingestionator.transformator import (
     ImageEntitiesTransformation,
     TableAnalysisTransformation
 )
-import logging
 from llama_index.core import Settings
 
 
-# TODO: config cache
-# TODO: add image processing later
-
 
 def create_pipeline():
+    """Create the ingestion pipeline"""
 
     # initialise the transformations
     text_cleaner = TextCleaner()
@@ -55,4 +52,5 @@ def create_pipeline():
 
 @log_duration
 def run_pipeline(documents, pipeline, embed_model=Settings.embed_model):
+    """Run the ingestion pipeline on a list of documents"""
     return pipeline.run(documents=documents, text_embed_model=embed_model)

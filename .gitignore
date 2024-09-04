@@ -2,6 +2,9 @@
 data/
 *.pkl
 
+# tests
+tests/
+
 # docker created files
 qdrant_storage/
 neo4j/

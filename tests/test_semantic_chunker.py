@@ -1,89 +1,26 @@
-import unittest
-from llama_index.embeddings.openai import OpenAIEmbedding
-from llama_ingestionator.transformator import SemanticChunker
-from llama_index.core.schema import TextNode
+from knowledge_extractor.scripts.llama_ingestionator.transformator import SemanticChunkingTransformation
 
 
-class TestSemanticChunker(unittest.TestCase):
+def test_transformation_pipeline():
 
-    @classmethod
-    def setUpClass(cls):
-        # Setup the OpenAI embedding model once for all tests
-        cls.embed_model = OpenAIEmbedding()
+    text_content = """
+    Artificial intelligence (AI) refers to the simulation of human intelligence in machines that are designed to think and act like humans. 
+    The term may also be applied to any machine that exhibits traits associated with a human mind such as learning and problem-solving. 
+    The ideal characteristic of artificial intelligence is its ability to rationalize and take actions that have the best chance of achieving a specific goal.
+    
+    AI is being used across various industries, including healthcare, finance, and robotics, to improve efficiency and reduce the need for human labor. 
+    In healthcare, AI algorithms can assist doctors in diagnosing diseases with greater accuracy. In finance, AI is used for fraud detection, algorithmic trading, 
+    and personal financial planning. Robotics leverages AI for tasks such as navigation and object manipulation.
 
-    def setUp(self):
-        # Initialize the SemanticChunker before each test
-        self.semantic_chunker = SemanticChunker(embed_model=self.embed_model)
+    However, there are concerns about AI's impact on employment and the ethical implications of delegating decision-making to machines. 
+    AI systems can sometimes reflect biases in the data they were trained on, which can lead to unintended and potentially harmful consequences. 
+    Researchers continue to work on addressing these challenges while advancing the technology's capabilities.
+    """
 
-    def test_semantic_chunking(self):
-        # Create a sample text node
-        sample_text = (
-            "This is a sample section text. It contains multiple sentences that should be "
-            "chunked into semantically coherent parts. This text is used to test the "
-            "semantic chunking functionality. Let's see how well it chunks this text. "
-            "Semantic chunking should ensure that sentences with related meanings stay together."
-        )
-        sample_node = TextNode(
-            text=sample_text,
-            metadata={
-                "id": "sample_section",
-                "type": "section",
-                "title": "Sample Section",
-            },
-        )
-
-        # Process the sample node
-        processed_nodes = self.semantic_chunker([sample_node])
-
-        # Assertions to check the results
-        self.assertGreater(
-            len(processed_nodes), 1, "Semantic chunking did not create any chunks."
-        )
-
-        # Check the original node is included
-        original_node = next(
-            (
-                node
-                for node in processed_nodes
-                if node.metadata["id"] == "sample_section"
-            ),
-            None,
-        )
-        self.assertIsNotNone(
-            original_node, "Original node not found in processed nodes."
-        )
-
-        # Check for at least one chunk
-        chunk_nodes = [
-            node for node in processed_nodes if node.metadata["id"] != "sample_section"
-        ]
-        self.assertGreater(len(chunk_nodes), 0, "No chunk nodes created.")
-
-        # Verify chunk metadata
-        for chunk in chunk_nodes:
-            self.assertIn(
-                "parent_id",
-                chunk.metadata,
-                "Chunk node missing 'parent_id' in metadata.",
-            )
-            self.assertEqual(
-                chunk.metadata["parent_id"],
-                "sample_section",
-                "Chunk node has incorrect 'parent_id'.",
-            )
-
-        # Print results for visual inspection
-        print("Original Node:")
-        print(f"ID: {sample_node.metadata['id']}")
-        print(f"Content: {sample_node.text}\n")
-
-        print("Processed Chunks:")
-        for i, chunk in enumerate(chunk_nodes):
-            print(f"Chunk {i+1}:")
-            print(f"ID: {chunk.metadata['id']}")
-            print(f"Parent ID: {chunk.metadata['parent_id']}")
-            print(f"Content: {chunk.text}\n")
-
-
-if __name__ == "__main__":
-    unittest.main()
+    semantic_chunking = SemanticChunkingTransformation()
+    chunks = semantic_chunking(text_content)
+    
+    # Check that chunking works correctly
+    assert isinstance(chunks, list)
+    assert len(chunks) > 0
+    assert chunks[0] in text_content

@@ -51,10 +51,17 @@ def process_question(question):
         retriever = GraphVectorRetriever(storage_manager, embed_model)
 
         # retrieve original nodes 
-        parent_nodes = retriever.fusion_retrieve(question)
+        parent_nodes, queries = retriever.fusion_retrieve(question)
         logging.info(
             f"Retrieved parent nodes: {[node.metadata['type'] for node in parent_nodes]}"
         )
+
+        # Process queries for display
+        if isinstance(queries, list):
+            queries_str = '\n'.join(queries)
+        else:
+            queries_str = str(queries)
+
 
         # Get context from retrieved nodes
         combined_text, combined_images = retriever.get_context_from_retrived_nodes(
@@ -76,6 +83,7 @@ def process_question(question):
             "- Structure your response using headings and bullet points for clarity.\n"
             "- Avoid repeating information.\n"
             "- Ensure the answer is informative and directly addresses the question.\n\n"
+            "- If there are relevant images that enhance the answer, please reference them to the user.\n\n"
             "- If no context was provided, please state that the context wasn't provided to answer the question"
             f"Question: {question}\n"
             "Answer:"
@@ -93,7 +101,7 @@ def process_question(question):
         logging.info(f"Enhanced Response: {enhanced_response}")
         logging.info(f"Standard Response: {standard_response}")
 
-        return str(enhanced_response), str(standard_response)
+        return queries_str, str(enhanced_response), str(standard_response)
 
     except Exception as e:
         logging.error(f"An error occurred: {e}")
@@ -113,9 +121,18 @@ def main() -> None:
         # Full-width question input
         question = gr.Textbox(label="Enter your question", placeholder="Type your question here...", elem_id="question_box")
 
-        # Example questions below
+        gr.Markdown("### Template Questions:")
         with gr.Row():
-            gr.Examples(examples=[["When was the Eiffel Tower built, and what was its original purpose?"]], inputs=question)
+            def set_question(q):
+                return q
+            btn1 = gr.Button("When was the Eiffel Tower built, and what was its original purpose?")
+            btn1.click(fn=lambda: set_question("When was the Eiffel Tower built, and what was its original purpose?"), outputs=question)
+            btn2 = gr.Button("What are some recent interesting facts about the Eiffel Tower?")
+            btn2.click(fn=lambda: set_question("What are some recent interesting facts about the Eiffel Tower?"), outputs=question)
+
+        # Display the generated queries
+        gr.Markdown("## Generated Queries:")
+        generated_queries = gr.Markdown()
 
         # Two columns for enhanced and standard responses to compare
         with gr.Row():
@@ -127,7 +144,7 @@ def main() -> None:
                 standard_response = gr.Markdown(label="Standard Response")
 
         # Submit button to process the question
-        question.submit(process_question, inputs=question, outputs=[enhanced_response, standard_response])
+        question.submit(process_question, inputs=question, outputs=[generated_queries, enhanced_response, standard_response])
 
     demo.launch(server_name="0.0.0.0", server_port=int(env_vars["UI_SERVER_PORT"]))
 

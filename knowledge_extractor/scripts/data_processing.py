@@ -10,9 +10,7 @@ def get_initial_nodes(topic="test", num_pages=1, wiki_url = None) -> list:
     """Load initial nodes from a file or process a page to create them."""
     
     clean_topic = sanitise_filename(topic)
-    # to change later after cleaning
-    filename = f'./data/{clean_topic}_initial_test'
-
+    filename = os.path.join(os.path.dirname(__file__), '..', 'data', f'{clean_topic}_initial')
     try:
         if os.path.exists(filename):
             try:
@@ -52,7 +50,8 @@ def create_transformed_nodes(
     """Transform and save nodes using the pipeline."""
 
     clean_topic = sanitise_filename(topic)
-    filename = f'./data/{clean_topic}_pipeline_test'
+    filename = os.path.join(os.path.dirname(__file__), '..', 'data', f'{clean_topic}_pipeline')
+
     try:
         if os.path.exists(filename):
             try:

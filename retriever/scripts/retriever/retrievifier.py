@@ -24,14 +24,6 @@ class GraphVectorRetriever:
         self.num_queries = num_queries
         self.llm = Settings.llm
 
-    # def vector_search(self, query_vector: List[float], top_k: int) -> List[str]:
-    #     logging.info(f"Performing vector search in Qdrant with top_k={top_k}")
-    #     search_results = self.storage_manager.vector_search(
-    #         query_vector,
-    #         top_k,
-    #         node_type=None,
-    #     )
-    #     return search_results
 
     def get_llama_node_ids(self, search_results):
         """Get Llama Node IDs from search results from the payload
@@ -236,7 +228,7 @@ class GraphVectorRetriever:
 
         parent_nodes = self.find_parent_nodes(llama_node_ids)
 
-        return parent_nodes
+        return parent_nodes, queries
 
     def get_context_from_retrived_nodes(self, parent_nodes):
         """Get combined text and images from the retrieved parent nodes to create context
@@ -253,6 +245,6 @@ class GraphVectorRetriever:
         texts = [node.text for node in parent_nodes if hasattr(node, "text")]
         combined_text = " ".join(texts)
         combined_images = " ".join(images)
-        logging.info(f"Texts from parent nodes: {texts}")
-        logging.info(f"Images from parent nodes: {images}")
+        logging.info(f"Texts from parent nodes: {len(texts)}")
+        logging.info(f"Images from parent nodes: {len(images)}")
         return combined_text, combined_images

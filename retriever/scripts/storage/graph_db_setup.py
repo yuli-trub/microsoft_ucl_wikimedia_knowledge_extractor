@@ -72,14 +72,14 @@ class Neo4jClient:
 
     def get_parent_node(self, node_id: str):
         with self.driver.session() as session:
-            logging.info(f"Retrieving parent node for Llama ID: {node_id}")
+            # logging.info(f"Retrieving parent node for Llama ID: {node_id}")
             record = session.execute_read(self._get_parent_node, node_id)
             if record is None:
                 logging.warning(f"Parent node for Llama ID {node_id} not found.")
                 return None
 
             parent_node = metadata_dict_to_node(record)
-            logging.info(f"Parent node retrieved : {parent_node}")
+            # logging.info(f"Parent node retrieved : {parent_node}")
             return parent_node
 
     @staticmethod
